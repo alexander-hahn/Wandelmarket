@@ -54,7 +54,7 @@ import {
 } from "@/lib/chipPresets";
 import {
   listActionIconButtonSx,
-  listTableContainerSx,
+  listTableContainerSx as sharedListTableContainerSx,
   listTableHeadSx,
   listTableRowSx,
 } from "@/lib/listTheme";
@@ -82,6 +82,8 @@ const EMPTY_FORM = {
   visibility: "members" as "members" | "teams",
   teamIds: [] as string[],
 };
+
+const listTableContainerSx = sharedListTableContainerSx as Record<string, unknown>;
 
 type FormState = typeof EMPTY_FORM;
 
@@ -511,8 +513,10 @@ export default function AdminPage() {
     setLoadingUsers(true);
     try {
       const res = await fetch("/api/users", { cache: "no-store" });
-      const data = await readJsonSafe<{ error?: string } | unknown[]>(res);
-      if (!res.ok) throw new Error(data.error || "Failed to load users");
+      const data = await readJsonSafe<{ error?: string } | AppUserRecord[]>(res);
+      if (!res.ok) {
+        throw new Error((data && !Array.isArray(data) && data.error) || "Failed to load users");
+      }
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       setToast({ message: err instanceof Error ? err.message : "Failed to load users", severity: "error" });
@@ -526,8 +530,10 @@ export default function AdminPage() {
     setLoadingListingSubmissions(true);
     try {
       const res = await fetch("/api/listing-submissions", { cache: "no-store" });
-      const data = await readJsonSafe<{ error?: string } | unknown[]>(res);
-      if (!res.ok) throw new Error(data.error || "Failed to load listing submissions");
+      const data = await readJsonSafe<{ error?: string } | ListingSubmission[]>(res);
+      if (!res.ok) {
+        throw new Error((data && !Array.isArray(data) && data.error) || "Failed to load listing submissions");
+      }
       setListingSubmissions(Array.isArray(data) ? data : []);
     } catch (err) {
       setToast({
@@ -562,9 +568,11 @@ export default function AdminPage() {
     setLoadingTeams(true);
     try {
       const res = await fetch("/api/teams", { cache: "no-store" });
-      const data = await readJsonSafe<{ error?: string } | unknown[]>(res);
-      if (!res.ok) throw new Error(data.error || "Failed to load teams");
-      setTeams(Array.isArray(data) ? (data as TeamRecord[]) : []);
+      const data = await readJsonSafe<{ error?: string } | TeamRecord[]>(res);
+      if (!res.ok) {
+        throw new Error((data && !Array.isArray(data) && data.error) || "Failed to load teams");
+      }
+      setTeams(Array.isArray(data) ? data : []);
     } catch (err) {
       setToast({ message: err instanceof Error ? err.message : "Failed to load teams", severity: "error" });
       setTeams([]);
