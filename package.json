@@ -1,5 +1,5 @@
 {
-  "name": "wandelshop-init",
+  "name": "wandelmarket",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,9 +9,21 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@emotion/cache": "^11.14.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.11",
+    "@mui/material": "^7.3.11",
+    "@mui/material-nextjs": "^9.0.1",
+    "@mui/system": "^7.3.11",
+    "@octokit/rest": "^22.0.1",
+    "@prisma/client": "^5.22.0",
+    "@wandelbots/wandelbots-js-react-components": "^5.5.4",
     "next": "16.2.6",
+    "prisma": "^5.22.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@types/node": "^20",

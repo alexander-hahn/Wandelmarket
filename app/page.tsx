@@ -1,66 +1,129 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Container from "@mui/material/Container";
+import { prisma } from "@/lib/db";
+import BrowseGrid from "@/components/BrowseGrid";
+import { cookies } from "next/headers";
+import { getSessionUserByToken, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string; team?: string }>;
+}) {
+  const { category, team } = await searchParams;
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value ?? "";
+  const user = token ? await getSessionUserByToken(token) : null;
+
+  const userTeams = user
+    ? await prisma.$queryRaw<Array<{ id: string; name: string; slug: string }>>`
+        SELECT t."id", t."name", t."slug"
+        FROM "AppUserTeam" ut
+        INNER JOIN "Team" t ON t."id" = ut."teamId"
+        WHERE ut."userId" = ${user.id} AND t."status" = ${"approved"}
+        ORDER BY t."name" ASC
+      `
+    : [];
+
+  const selectedTeam = team && userTeams.some((entry) => entry.slug === team) ? team : "all";
+
+  const teamFilterSql = selectedTeam !== "all"
+    ? prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT i."id"
+        FROM "ShopItem" i
+        INNER JOIN "ShopItemTeam" it ON it."itemId" = i."id"
+        INNER JOIN "Team" t ON t."id" = it."teamId"
+        WHERE t."slug" = ${selectedTeam}
+      `
+    : Promise.resolve<Array<{ id: string }>>([]);
+
+  const teamFilteredItemIds = new Set((await teamFilterSql).map((row) => row.id));
+
+  const items = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      name: string;
+      description: string;
+      category: string;
+      author: string;
+      version: string | null;
+      downloadUrl: string | null;
+      repoUrl: string | null;
+      websiteUrl: string | null;
+      thumbnailUrl: string | null;
+      thumbnailOverride: string | null;
+      tags: string;
+      source: string;
+      providerKey: string | null;
+      stars: number;
+      installInstructions: string | null;
+      visibility: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>
+  >`
+    SELECT i.*
+    FROM "ShopItem" i
+    WHERE (
+      i."visibility" = ${"members"}
+      OR (
+        i."visibility" = ${"teams"}
+        AND EXISTS (
+          SELECT 1
+          FROM "ShopItemTeam" it
+          INNER JOIN "AppUserTeam" ut ON ut."teamId" = it."teamId"
+          INNER JOIN "Team" t ON t."id" = it."teamId"
+          WHERE it."itemId" = i."id"
+            AND ut."userId" = ${user?.id ?? ""}
+            AND t."status" = ${"approved"}
+        )
+      )
+    )
+    ORDER BY i."stars" DESC, i."createdAt" DESC
+  `;
+
+  const visibilityFilteredItems = selectedTeam === "all"
+    ? items
+    : items.filter((item) => teamFilteredItemIds.has(item.id));
+
+  const normalizedItems = visibilityFilteredItems.map((item) => ({
+    ...item,
+    tags: item.tags || "[]",
+  }));
+
+  // Count per category for sidebar badges
+  const counts: Record<string, number> = { all: normalizedItems.length };
+  for (const item of normalizedItems) {
+    counts[item.category] = (counts[item.category] ?? 0) + 1;
+  }
+
+  const teamCounts = await Promise.all(
+    userTeams.map(async (entry) => {
+      const rows = await prisma.$queryRaw<Array<{ count: number }>>`
+        SELECT CAST(COUNT(DISTINCT i."id") AS INT) as "count"
+        FROM "ShopItem" i
+        INNER JOIN "ShopItemTeam" it ON it."itemId" = i."id"
+        INNER JOIN "Team" t ON t."id" = it."teamId"
+        INNER JOIN "AppUserTeam" ut ON ut."teamId" = t."id"
+        WHERE ut."userId" = ${user?.id ?? ""}
+          AND t."status" = ${"approved"}
+          AND t."id" = ${entry.id}
+      `;
+      return { ...entry, count: rows[0]?.count ?? 0 };
+    })
+  );
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <BrowseGrid
+        items={normalizedItems}
+        initialCategory={category ?? "all"}
+        counts={counts}
+        activeTeamFilter={selectedTeam}
+        teamFilters={teamCounts}
+      />
+    </Container>
   );
 }

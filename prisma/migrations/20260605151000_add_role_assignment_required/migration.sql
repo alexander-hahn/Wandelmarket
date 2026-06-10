@@ -1,0 +1,1 @@
+ALTER TABLE "AppUser" ADD COLUMN "roleAssignmentRequired" BOOLEAN NOT NULL DEFAULT 0;

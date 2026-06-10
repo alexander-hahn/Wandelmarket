@@ -1,0 +1,2 @@
+ALTER TABLE "AppUser"
+ADD COLUMN "collectedBounties" INTEGER NOT NULL DEFAULT 0;

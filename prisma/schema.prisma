@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AppUser {
+  id          String   @id
+  displayName String?
+  firstName   String?
+  lastName    String?
+  email       String?  @unique
+  passwordHash String?
+  role        String   @default("member") // "member" | "moderator" | "admin"
+  collectedBounties Int @default(0)
+  roleAssignmentRequired Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  teams       AppUserTeam[]
+
+  @@index([role])
+}
+
+model AppSession {
+  token     String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model ShopItem {
+  id           String   @id @default(cuid())
+  name         String
+  description  String
+  category     String   // "app" | "isaac_sim_extension" | "website" | "project" | "3d_print" | "3d_asset"
+  author       String
+  version      String?
+  downloadUrl  String?
+  repoUrl      String?
+  websiteUrl   String?
+  thumbnailUrl String?
+  thumbnailOverride String? // Set via admin; takes precedence over thumbnailUrl on display; never overwritten by sync
+  tags         String   @default("[]") // JSON array stored as string
+  source       String   @default("manual") // "github" | "nucleus" | "artifacts" | "manual"
+  providerKey  String?  @unique // e.g. "github:org/repo", "nucleus:/Projects/Extensions/myext"
+  stars        Int      @default(0)
+  installInstructions String? // Markdown: steps, code snippets, requirements
+  visibility   String   @default("members") // "members" | "teams"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  teams        ShopItemTeam[]
+}
+
+model BountyRequest {
+  id                String   @id @default(cuid())
+  title             String
+  description       String
+  requester         String
+  requestedCategory String   @default("project")
+  bountyStars       Int      @default(1)
+  reward            String?
+  status            String   @default("open") // "open" | "pending" | "collected"
+  convertedItemId   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model BountyCollect {
+  id          String   @id @default(cuid())
+  bountyId    String
+  collectorId String
+  createdAt   DateTime @default(now())
+
+  @@index([bountyId])
+  @@unique([bountyId, collectorId])
+}
+
+model ListingSubmission {
+  id               String   @id @default(cuid())
+  name             String
+  description      String
+  category         String
+  author           String
+  version          String?
+  downloadUrl      String?
+  repoUrl          String?
+  websiteUrl       String?
+  thumbnailUrl     String?
+  tags             String   @default("[]")
+  installInstructions String?
+  visibility       String   @default("members") // "members" | "teams"
+  submittedByUserId String
+  status           String   @default("pending") // "pending" | "approved" | "rejected"
+  approvedByUserId String?
+  approvedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  teams            ListingSubmissionTeam[]
+
+  @@index([status])
+  @@index([submittedByUserId])
+  @@index([createdAt])
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  status    String   @default("pending") // "pending" | "approved" | "rejected"
+  createdByUserId String
+  leaderUserId String
+  approvedByUserId String?
+  approvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     AppUserTeam[]
+  items     ShopItemTeam[]
+  submissions ListingSubmissionTeam[]
+
+  @@index([name])
+}
+
+model AppUserTeam {
+  userId    String
+  teamId    String
+  role      String   @default("member") // "member" | "leader"
+  createdAt DateTime @default(now())
+  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@id([userId, teamId])
+  @@index([teamId])
+}
+
+model ShopItemTeam {
+  itemId    String
+  teamId    String
+  createdAt DateTime @default(now())
+  item      ShopItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, teamId])
+  @@index([teamId])
+}
+
+model ListingSubmissionTeam {
+  submissionId String
+  teamId       String
+  createdAt    DateTime @default(now())
+  submission   ListingSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  team         Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@id([submissionId, teamId])
+  @@index([teamId])
+}

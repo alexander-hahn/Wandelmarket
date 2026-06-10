@@ -1,0 +1,9 @@
+CREATE TABLE "AppUser" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "displayName" TEXT,
+  "role" TEXT NOT NULL DEFAULT 'member',
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX "AppUser_role_idx" ON "AppUser"("role");
