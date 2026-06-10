@@ -4,20 +4,13 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Chip from "@mui/material/Chip";
 import Button from "@mui/material/Button";
-import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
-import Paper from "@mui/material/Paper";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import DownloadIcon from "@mui/icons-material/Download";
-import GitHubIcon from "@mui/icons-material/GitHub";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import LanguageIcon from "@mui/icons-material/Language";
 import StarIcon from "@mui/icons-material/Star";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import InstallInstructions from "@/components/InstallInstructions";
 import FavoriteButton from "@/components/FavoriteButton";
-import RelatedItemsCarousel from "../../../components/RelatedItemsCarousel";
+import ItemDetailTabs from "@/components/ItemDetailTabs";
 import { CATEGORY_COLORS, CATEGORY_COMPANIONS, CATEGORY_LABELS } from "@/lib/categories";
 
 function parseTags(raw: string | null | undefined): string[] {
@@ -108,13 +101,6 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
             </Stack>
           )}
         </Stack>
-        {tags.length > 0 && (
-          <Stack direction="row" spacing={0.75} flexWrap="wrap">
-            {tags.map((tag) => (
-              <Chip key={tag} label={tag} size="small" variant="outlined" />
-            ))}
-          </Stack>
-        )}
       </Stack>
 
       <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
@@ -130,72 +116,16 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         {item.source === "github" && item.providerKey && ` · ${item.providerKey.replace("github:", "")}`}
       </Typography>
 
-      <Typography variant="body1" sx={{ mt: 2, mb: 3, lineHeight: 1.8 }}>
-        {item.description}
-      </Typography>
-
-      <Stack direction="row" spacing={2} flexWrap="wrap" mb={4}>
-        {item.category === "website" && item.websiteUrl ? (
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={<LanguageIcon />}
-            href={item.websiteUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Visit Website
-          </Button>
-        ) : (
-          <>
-            {item.downloadUrl && (
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<DownloadIcon />}
-                href={item.downloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Download
-              </Button>
-            )}
-          </>
-        )}
-        {item.repoUrl && (
-          <Button
-            variant="outlined"
-            size="large"
-            startIcon={item.source === "github" ? <GitHubIcon /> : <OpenInNewIcon />}
-            href={item.repoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            View Repository
-          </Button>
-        )}
-      </Stack>
-
-      {item.installInstructions && (
-        <>
-          <Divider sx={{ mb: 3 }} />
-          <Typography variant="h5" fontWeight={600} gutterBottom>
-            Installation Instructions
-          </Typography>
-          <Paper
-            elevation={8}
-            sx={{ p: 3, borderRadius: 2, border: "1px solid", borderColor: "divider", boxShadow: "none" }}
-          >
-            <InstallInstructions markdown={item.installInstructions} />
-          </Paper>
-        </>
-      )}
-
-      <Divider sx={{ my: 3 }} />
-      <Typography variant="h5" fontWeight={600} gutterBottom>
-        4. Related Items
-      </Typography>
-      <RelatedItemsCarousel items={relatedItems} />
+      <ItemDetailTabs
+        description={item.description}
+        category={item.category}
+        websiteUrl={item.websiteUrl}
+        downloadUrl={item.downloadUrl}
+        repoUrl={item.repoUrl}
+        source={item.source}
+        installInstructions={item.installInstructions}
+        relatedItems={relatedItems}
+      />
     </Container>
   );
 }
