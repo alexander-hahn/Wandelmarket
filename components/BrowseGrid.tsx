@@ -8,6 +8,7 @@ import InputAdornment from "@mui/material/InputAdornment";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
+import Divider from "@mui/material/Divider";
 import SearchIcon from "@mui/icons-material/Search";
 import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
 import ItemCard from "@/components/ItemCard";
@@ -20,14 +21,10 @@ const FAVORITES_CHANGED_EVENT = "wandelshop:favorites:changed";
 export default function BrowseGrid({
   items,
   initialCategory = "all",
-  activeTeamFilter = "all",
-  teamFilters = [],
 }: {
   items: Array<ShopItem>;
   initialCategory?: string;
   counts?: Record<string, number>;
-  activeTeamFilter?: string;
-  teamFilters?: Array<{ id: string; name: string; slug: string; count: number }>;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -86,17 +83,6 @@ export default function BrowseGrid({
     router.push("/listings/new");
   };
 
-  const handleTeamFilterChange = (team: string) => {
-    const params = new URLSearchParams(window.location.search);
-    if (team === "all") {
-      params.delete("team");
-    } else {
-      params.set("team", team);
-    }
-    const query = params.toString();
-    router.push(query ? `/?${query}` : "/");
-  };
-
   return (
     <>
       <Stack spacing={1.5} sx={{ mb: 3 }}>
@@ -140,29 +126,9 @@ export default function BrowseGrid({
             Create Listing
           </Button>
         </Stack>
-
-        {teamFilters.length > 0 && (
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Button
-              size="small"
-              variant={activeTeamFilter === "all" ? "contained" : "outlined"}
-              onClick={() => handleTeamFilterChange("all")}
-            >
-              All Teams
-            </Button>
-            {teamFilters.map((team) => (
-              <Button
-                key={team.id}
-                size="small"
-                variant={activeTeamFilter === team.slug ? "contained" : "outlined"}
-                onClick={() => handleTeamFilterChange(team.slug)}
-              >
-                {team.name} ({team.count})
-              </Button>
-            ))}
-          </Stack>
-        )}
       </Stack>
+
+      <Divider sx={{ mb: 3 }} />
 
       {filtered.length === 0 ? (
         <Typography color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>

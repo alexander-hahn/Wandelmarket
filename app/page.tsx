@@ -99,31 +99,9 @@ export default async function HomePage({
     counts[item.category] = (counts[item.category] ?? 0) + 1;
   }
 
-  const teamCounts = await Promise.all(
-    userTeams.map(async (entry) => {
-      const rows = await prisma.$queryRaw<Array<{ count: number }>>`
-        SELECT CAST(COUNT(DISTINCT i."id") AS INT) as "count"
-        FROM "ShopItem" i
-        INNER JOIN "ShopItemTeam" it ON it."itemId" = i."id"
-        INNER JOIN "Team" t ON t."id" = it."teamId"
-        INNER JOIN "AppUserTeam" ut ON ut."teamId" = t."id"
-        WHERE ut."userId" = ${user?.id ?? ""}
-          AND t."status" = ${"approved"}
-          AND t."id" = ${entry.id}
-      `;
-      return { ...entry, count: rows[0]?.count ?? 0 };
-    })
-  );
-
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
-      <BrowseGrid
-        items={normalizedItems}
-        initialCategory={category ?? "all"}
-        counts={counts}
-        activeTeamFilter={selectedTeam}
-        teamFilters={teamCounts}
-      />
+      <BrowseGrid items={normalizedItems} initialCategory={category ?? "all"} counts={counts} />
     </Container>
   );
 }
