@@ -129,6 +129,19 @@ model Team {
   @@index([name])
 }
 
+model TeamOwnershipAudit {
+  id                  String   @id
+  teamId              String
+  fromLeaderUserId    String
+  toLeaderUserId      String
+  transferredByUserId String
+  reason              String?
+  createdAt           DateTime @default(now())
+
+  @@index([teamId])
+  @@index([createdAt])
+}
+
 model AppUserTeam {
   userId    String
   teamId    String

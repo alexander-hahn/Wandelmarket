@@ -2,20 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireRoles } from "@/lib/auth";
 
-async function ensureTeamOwnershipAuditTable() {
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS "TeamOwnershipAudit" (
-      "id" TEXT PRIMARY KEY,
-      "teamId" TEXT NOT NULL,
-      "fromLeaderUserId" TEXT NOT NULL,
-      "toLeaderUserId" TEXT NOT NULL,
-      "transferredByUserId" TEXT NOT NULL,
-      "reason" TEXT,
-      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `;
-}
-
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -90,8 +76,6 @@ export async function POST(
       { status: 409 }
     );
   }
-
-  await ensureTeamOwnershipAuditTable();
 
   await prisma.$transaction(async (tx) => {
     const updateTeamCount = await tx.$executeRaw`
