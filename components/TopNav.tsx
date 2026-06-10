@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Stack from "@mui/material/Stack";
 import IconButton from "@mui/material/IconButton";
 import Avatar from "@mui/material/Avatar";
-import Button from "@mui/material/Button";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Divider from "@mui/material/Divider";
@@ -196,19 +195,8 @@ export default function TopNav({ initialUser = null }: { initialUser?: AuthUser 
         </Tabs>
       </Stack>
 
-      {/* Right side: Admin */}
+      {/* Right side: User menu */}
       <Stack direction="row" spacing={1} alignItems="center">
-        {canAccessAdmin && (
-          <Button
-            component={Link}
-            href="/admin"
-            size="small"
-            startIcon={<AdminPanelSettingsIcon sx={{ fontSize: 16 }} />}
-            sx={{ textTransform: "none", color: "text.secondary" }}
-          >
-            Admin
-          </Button>
-        )}
         {isAuthenticated && (
           <IconButton
             size="small"
@@ -232,6 +220,12 @@ export default function TopNav({ initialUser = null }: { initialUser?: AuthUser 
           <PersonIcon fontSize="small" sx={{ mr: 1 }} />
           User
         </MenuItem>
+        {isAuthenticated && canAccessAdmin && (
+          <MenuItem component={Link} href="/admin" onClick={handleCloseUserMenu}>
+            <AdminPanelSettingsIcon fontSize="small" sx={{ mr: 1 }} />
+            Admin
+          </MenuItem>
+        )}
         <Divider />
         <MenuItem
           onClick={() => {
