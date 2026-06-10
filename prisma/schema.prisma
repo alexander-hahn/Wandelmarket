@@ -156,6 +156,19 @@ model Announcement {
   @@index([createdAt])
 }
 
+model ListingComment {
+  id         String   @id
+  itemId     String
+  userId     String
+  authorName String
+  message    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([itemId])
+  @@index([createdAt])
+}
+
 model AppUserTeam {
   userId    String
   teamId    String

@@ -12,19 +12,6 @@ import GitHubIcon from "@mui/icons-material/GitHub";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import LanguageIcon from "@mui/icons-material/Language";
 import InstallInstructions from "@/components/InstallInstructions";
-import RelatedItemsCarousel from "@/components/RelatedItemsCarousel";
-
-interface RelatedItem {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  author: string;
-  stars: number;
-  thumbnailUrl: string | null;
-  thumbnailOverride: string | null;
-  tags: string[];
-}
 
 interface ItemDetailTabsProps {
   description: string;
@@ -34,7 +21,6 @@ interface ItemDetailTabsProps {
   repoUrl: string | null;
   source: string;
   installInstructions: string | null;
-  relatedItems: RelatedItem[];
 }
 
 export default function ItemDetailTabs({
@@ -45,7 +31,6 @@ export default function ItemDetailTabs({
   repoUrl,
   source,
   installInstructions,
-  relatedItems,
 }: ItemDetailTabsProps) {
   const hasInstallInstructions = Boolean(installInstructions && installInstructions.trim().length > 0);
   const hasLinks = Boolean(websiteUrl || downloadUrl || repoUrl);
@@ -60,7 +45,6 @@ export default function ItemDetailTabs({
         <Tab label="Details" />
         <Tab label="Installation" />
         <Tab label="Links" />
-        <Tab label="Related" />
       </Tabs>
 
       <Box sx={{ pt: 2 }}>
@@ -119,7 +103,9 @@ export default function ItemDetailTabs({
           </Typography>
           )
         ) : (
-          <RelatedItemsCarousel items={relatedItems} />
+          <Typography variant="body2" color="text.secondary">
+            No external links available for this listing.
+          </Typography>
         )}
       </Box>
     </Box>

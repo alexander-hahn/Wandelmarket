@@ -4,14 +4,19 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Chip from "@mui/material/Chip";
 import Button from "@mui/material/Button";
+import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import StarIcon from "@mui/icons-material/Star";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import FavoriteButton from "@/components/FavoriteButton";
 import ItemDetailTabs from "@/components/ItemDetailTabs";
+import RelatedItemsCarousel from "@/components/RelatedItemsCarousel";
+import ListingDiscussion from "@/components/ListingDiscussion";
 import { CATEGORY_COLORS, CATEGORY_COMPANIONS, CATEGORY_LABELS } from "@/lib/categories";
+import { getSessionUserByToken, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 
 function parseTags(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -27,6 +32,10 @@ function parseTags(raw: string | null | undefined): string[] {
 
 export default async function ItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value ?? "";
+  const currentUser = token ? await getSessionUserByToken(token) : null;
+
   const item = await prisma.shopItem.findUnique({ where: { id } });
 
   if (!item) notFound();
@@ -69,6 +78,15 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
     .filter((candidate) => candidate.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 10);
+
+  const comments = await prisma.$queryRaw<
+    Array<{ id: string; userId: string; authorName: string; message: string; createdAt: Date }>
+  >`
+    SELECT "id", "userId", "authorName", "message", "createdAt"
+    FROM "ListingComment"
+    WHERE "itemId" = ${item.id}
+    ORDER BY "createdAt" DESC
+  `;
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -124,7 +142,25 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         repoUrl={item.repoUrl}
         source={item.source}
         installInstructions={item.installInstructions}
-        relatedItems={relatedItems}
+      />
+
+      <Divider sx={{ my: 3 }} />
+
+      <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>
+        Related
+      </Typography>
+
+      <RelatedItemsCarousel items={relatedItems} />
+
+      <Divider sx={{ my: 3 }} />
+
+      <ListingDiscussion
+        itemId={item.id}
+        currentUserId={currentUser?.id ?? null}
+        initialComments={comments.map((comment) => ({
+          ...comment,
+          createdAt: new Date(comment.createdAt).toISOString(),
+        }))}
       />
     </Container>
   );
