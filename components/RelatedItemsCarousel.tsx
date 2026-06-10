@@ -53,18 +53,22 @@ export default function RelatedItemsCarousel({ items }: { items: RelatedItem[] }
         <Box
           component={Link}
           href={`/item/${item.id}`}
-          sx={{ textDecoration: "none", display: "block", height: "100%" }}
+          sx={{ textDecoration: "none", display: "flex", flexDirection: "column", height: "100%" }}
         >
           <Paper
-            elevation={6}
+            elevation={0}
             sx={{
               p: 1.5,
-              height: "100%",
+              flex: 1,
+              bgcolor: "#10131f",
+              color: "text.primary",
               border: "1px solid rgba(255,255,255,0.12)",
-              transition: "transform 0.16s ease, box-shadow 0.16s ease",
+              borderBottomLeftRadius: 0,
+              borderBottomRightRadius: 0,
+              transition: "transform 0.16s ease, border-color 0.16s ease",
               "&:hover": {
                 transform: "translateY(-2px)",
-                boxShadow: 8,
+                borderColor: "rgba(255,255,255,0.2)",
               },
             }}
           >
@@ -80,7 +84,7 @@ export default function RelatedItemsCarousel({ items }: { items: RelatedItem[] }
                 alignItems: "center",
                 justifyContent: "center",
                 color: CATEGORY_COLORS[item.category] ?? "text.secondary",
-                bgcolor: "action.hover",
+                bgcolor: (item.thumbnailOverride ?? item.thumbnailUrl) ? "action.hover" : "#10131f",
               }}
             >
               {(item.thumbnailOverride ?? item.thumbnailUrl) ? (
@@ -111,7 +115,26 @@ export default function RelatedItemsCarousel({ items }: { items: RelatedItem[] }
             >
               {item.description}
             </Typography>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mt={1}>
+          </Paper>
+
+          <Paper
+            elevation={8}
+            sx={{
+              mt: -1,
+              px: 1,
+              py: 0.85,
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              borderBottomLeftRadius: "10px",
+              borderBottomRightRadius: "10px",
+              border: "1px solid",
+              borderColor: "divider",
+              backgroundColor: "background.paper",
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography variant="caption" color="text.secondary">
                 by {item.author}
               </Typography>
