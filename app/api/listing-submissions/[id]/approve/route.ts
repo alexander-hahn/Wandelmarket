@@ -26,6 +26,9 @@ export async function POST(
         thumbnailUrl: string | null;
         tags: string;
         installInstructions: string | null;
+        compatibilityOs: string;
+        compatibilityAppVersions: string;
+        compatibilityToolchain: string;
         visibility: string;
         status: string;
       } | null>;
@@ -53,6 +56,9 @@ export async function POST(
         thumbnailUrl: submission.thumbnailUrl || undefined,
         tags: submission.tags || "[]",
         installInstructions: submission.installInstructions || undefined,
+        compatibilityOs: submission.compatibilityOs || "[]",
+        compatibilityAppVersions: submission.compatibilityAppVersions || "[]",
+        compatibilityToolchain: submission.compatibilityToolchain || "[]",
         visibility: submission.visibility || "members",
         source: "manual",
       },
@@ -99,6 +105,9 @@ export async function POST(
       thumbnailUrl: string | null;
       tags: string;
       installInstructions: string | null;
+      compatibilityOs: string;
+      compatibilityAppVersions: string;
+      compatibilityToolchain: string;
       visibility: string;
       status: string;
     }>
@@ -123,6 +132,9 @@ export async function POST(
       thumbnailUrl: submission.thumbnailUrl || undefined,
       tags: submission.tags || "[]",
       installInstructions: submission.installInstructions || undefined,
+      compatibilityOs: submission.compatibilityOs || "[]",
+      compatibilityAppVersions: submission.compatibilityAppVersions || "[]",
+      compatibilityToolchain: submission.compatibilityToolchain || "[]",
       visibility: submission.visibility || "members",
       source: "manual",
     },

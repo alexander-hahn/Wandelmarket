@@ -14,6 +14,17 @@ function parseTags(raw: string | null | undefined): string[] {
   }
 }
 
+function parseStringArray(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((entry): entry is string => typeof entry === "string");
+  } catch {
+    return [];
+  }
+}
+
 function normalizeOptionalString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -84,10 +95,13 @@ export async function GET(
       thumbnailUrl: string | null;
       tags: string;
       installInstructions: string | null;
+      compatibilityOs: string;
+      compatibilityAppVersions: string;
+      compatibilityToolchain: string;
       visibility: string;
     }>
   >`
-    SELECT "id", "name", "description", "category", "version", "downloadUrl", "repoUrl", "websiteUrl", "thumbnailUrl", "tags", "installInstructions", "visibility"
+    SELECT "id", "name", "description", "category", "version", "downloadUrl", "repoUrl", "websiteUrl", "thumbnailUrl", "tags", "installInstructions", "compatibilityOs", "compatibilityAppVersions", "compatibilityToolchain", "visibility"
     FROM "ListingSubmission"
     WHERE "id" = ${id} AND "submittedByUserId" = ${auth.user.id}
     LIMIT 1
@@ -114,6 +128,9 @@ export async function GET(
       thumbnailUrl: submission.thumbnailUrl,
       tags: parseTags(submission.tags),
       installInstructions: submission.installInstructions,
+      compatibilityOs: parseStringArray(submission.compatibilityOs),
+      compatibilityAppVersions: parseStringArray(submission.compatibilityAppVersions),
+      compatibilityToolchain: parseStringArray(submission.compatibilityToolchain),
       visibility: normalizeVisibility(submission.visibility),
       teamIds: teamRows.map((row) => row.teamId),
     });
@@ -135,6 +152,9 @@ export async function GET(
       thumbnailUrl: true,
       tags: true,
       installInstructions: true,
+      compatibilityOs: true,
+      compatibilityAppVersions: true,
+      compatibilityToolchain: true,
       visibility: true,
     },
   });
@@ -165,6 +185,9 @@ export async function GET(
     thumbnailUrl: item.thumbnailOverride || item.thumbnailUrl,
     tags: parseTags(item.tags),
     installInstructions: item.installInstructions,
+    compatibilityOs: parseStringArray(item.compatibilityOs),
+    compatibilityAppVersions: parseStringArray(item.compatibilityAppVersions),
+    compatibilityToolchain: parseStringArray(item.compatibilityToolchain),
     visibility: normalizeVisibility(item.visibility),
     teamIds: teamRows.map((row) => row.teamId),
   });
@@ -191,6 +214,9 @@ export async function PATCH(
     thumbnailUrl,
     tags,
     installInstructions,
+    compatibilityOs,
+    compatibilityAppVersions,
+    compatibilityToolchain,
     visibility,
     teamIds,
   } = body as {
@@ -204,6 +230,9 @@ export async function PATCH(
     thumbnailUrl?: unknown;
     tags?: unknown;
     installInstructions?: unknown;
+    compatibilityOs?: unknown;
+    compatibilityAppVersions?: unknown;
+    compatibilityToolchain?: unknown;
     visibility?: unknown;
     teamIds?: unknown;
   };
@@ -229,6 +258,13 @@ export async function PATCH(
 
   const derivedAuthor = auth.user.displayName?.trim() || auth.user.id;
   const safeTags = JSON.stringify(Array.isArray(tags) ? tags : []);
+  const safeCompatibilityOs = JSON.stringify(Array.isArray(compatibilityOs) ? compatibilityOs : []);
+  const safeCompatibilityAppVersions = JSON.stringify(
+    Array.isArray(compatibilityAppVersions) ? compatibilityAppVersions : []
+  );
+  const safeCompatibilityToolchain = JSON.stringify(
+    Array.isArray(compatibilityToolchain) ? compatibilityToolchain : []
+  );
   const now = new Date();
 
   const submissionRows = await prisma.$queryRaw<Array<{ id: string }>>`
@@ -253,6 +289,9 @@ export async function PATCH(
         "thumbnailUrl" = ${normalizeOptionalString(thumbnailUrl)},
         "tags" = ${safeTags},
         "installInstructions" = ${normalizeOptionalString(installInstructions)},
+        "compatibilityOs" = ${safeCompatibilityOs},
+        "compatibilityAppVersions" = ${safeCompatibilityAppVersions},
+        "compatibilityToolchain" = ${safeCompatibilityToolchain},
         "visibility" = ${normalizedVisibility},
         "status" = ${"pending"},
         "approvedByUserId" = ${null},
@@ -308,6 +347,9 @@ export async function PATCH(
       thumbnailOverride: normalizeOptionalString(thumbnailUrl),
       tags: safeTags,
       installInstructions: normalizeOptionalString(installInstructions),
+      compatibilityOs: safeCompatibilityOs,
+      compatibilityAppVersions: safeCompatibilityAppVersions,
+      compatibilityToolchain: safeCompatibilityToolchain,
       visibility: normalizedVisibility,
     },
   });

@@ -30,6 +30,18 @@ function parseTags(raw: string | null | undefined): string[] {
   }
 }
 
+function parseStringArray(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export default async function ItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const cookieStore = await cookies();
@@ -40,7 +52,16 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
   if (!item) notFound();
 
+  const itemWithCompatibility = item as typeof item & {
+    compatibilityOs?: string | null;
+    compatibilityAppVersions?: string | null;
+    compatibilityToolchain?: string | null;
+  };
+
   const tags = parseTags(item.tags);
+  const compatibilityOs = parseStringArray(itemWithCompatibility.compatibilityOs);
+  const compatibilityAppVersions = parseStringArray(itemWithCompatibility.compatibilityAppVersions);
+  const compatibilityToolchain = parseStringArray(itemWithCompatibility.compatibilityToolchain);
   const normalizedCurrentTags = new Set(tags.map((tag) => tag.trim().toLowerCase()));
 
   const candidates = await prisma.shopItem.findMany({
@@ -142,6 +163,9 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         repoUrl={item.repoUrl}
         source={item.source}
         installInstructions={item.installInstructions}
+        compatibilityOs={compatibilityOs}
+        compatibilityAppVersions={compatibilityAppVersions}
+        compatibilityToolchain={compatibilityToolchain}
       />
 
       <Divider sx={{ my: 3 }} />

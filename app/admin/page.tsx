@@ -61,6 +61,9 @@ import {
 import type { ShopItem } from "@prisma/client";
 
 type AdminItem = ShopItem & {
+  compatibilityOs?: string;
+  compatibilityAppVersions?: string;
+  compatibilityToolchain?: string;
   teamIds?: string[];
   teamNames?: string[];
 };
@@ -79,6 +82,9 @@ const EMPTY_FORM = {
   thumbnailUrl: "",
   tags: [] as string[],
   installInstructions: "",
+  compatibilityOs: [] as string[],
+  compatibilityAppVersions: [] as string[],
+  compatibilityToolchain: [] as string[],
   visibility: "members" as "members" | "teams",
   teamIds: [] as string[],
 };
@@ -179,6 +185,18 @@ function getUserAuthorLabel(user: AppUserRecord) {
 
 function normalizeIdentity(value: string) {
   return value.trim().toLowerCase();
+}
+
+function parseStringArray(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 async function readJsonSafe<T>(res: Response): Promise<T | null> {
@@ -724,6 +742,9 @@ export default function AdminPage() {
       thumbnailUrl: "",
       tags: ["bounty", "request"],
       installInstructions: bounty.reward ? `## Reward\n${bounty.reward}` : "",
+      compatibilityOs: [],
+      compatibilityAppVersions: [],
+      compatibilityToolchain: [],
       visibility: "members",
       teamIds: [],
     });
@@ -769,15 +790,7 @@ export default function AdminPage() {
 
     setEditingId(item.id);
     setSourceBountyId(null);
-    let tags: string[] = [];
-    try {
-      const parsed: unknown = JSON.parse(item.tags || "[]");
-      if (Array.isArray(parsed)) {
-        tags = parsed.filter((tag): tag is string => typeof tag === "string");
-      }
-    } catch {
-      tags = [];
-    }
+    const tags = parseStringArray(item.tags);
     setForm({
       name: item.name,
       description: item.description,
@@ -788,8 +801,11 @@ export default function AdminPage() {
       repoUrl: item.repoUrl ?? "",
       websiteUrl: item.websiteUrl ?? "",
       thumbnailUrl: item.thumbnailOverride ?? item.thumbnailUrl ?? "",
-      tags: tags,
+      tags,
       installInstructions: item.installInstructions ?? "",
+      compatibilityOs: parseStringArray(item.compatibilityOs),
+      compatibilityAppVersions: parseStringArray(item.compatibilityAppVersions),
+      compatibilityToolchain: parseStringArray(item.compatibilityToolchain),
       visibility: item.visibility === "teams" ? "teams" : "members",
       teamIds: Array.isArray(item.teamIds) ? item.teamIds : [],
     });
@@ -811,6 +827,9 @@ export default function AdminPage() {
         websiteUrl: form.category === "website" ? (form.websiteUrl || undefined) : undefined,
         thumbnailUrl: form.thumbnailUrl || undefined,
         installInstructions: form.installInstructions || undefined,
+        compatibilityOs: form.compatibilityOs,
+        compatibilityAppVersions: form.compatibilityAppVersions,
+        compatibilityToolchain: form.compatibilityToolchain,
         visibility: form.visibility,
         teamIds: form.visibility === "teams" ? form.teamIds : [],
       };
@@ -2651,6 +2670,53 @@ export default function AdminPage() {
 <TagInput
               tags={form.tags}
               onChange={(tags) => setForm((f) => ({ ...f, tags }))}
+            />
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                label="Supported OS (comma separated)"
+                fullWidth
+                value={form.compatibilityOs.join(", ")}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    compatibilityOs: e.target.value
+                      .split(",")
+                      .map((entry) => entry.trim())
+                      .filter(Boolean),
+                  }))
+                }
+                placeholder="Windows, macOS, Ubuntu 24.04"
+              />
+              <TextField
+                label="Supported App Versions"
+                fullWidth
+                value={form.compatibilityAppVersions.join(", ")}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    compatibilityAppVersions: e.target.value
+                      .split(",")
+                      .map((entry) => entry.trim())
+                      .filter(Boolean),
+                  }))
+                }
+                placeholder="Wandel Operate 2026.2, 2026.3"
+              />
+            </Stack>
+            <TextField
+              label="Supported Toolchain Versions"
+              fullWidth
+              value={form.compatibilityToolchain.join(", ")}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  compatibilityToolchain: e.target.value
+                    .split(",")
+                    .map((entry) => entry.trim())
+                    .filter(Boolean),
+                }))
+              }
+              placeholder="Isaac Sim 4.2, Python 3.11"
             />
             <TextField
               label="Installation Instructions (Markdown)"

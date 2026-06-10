@@ -51,6 +51,9 @@ model ShopItem {
   providerKey  String?  @unique // e.g. "github:org/repo", "nucleus:/Projects/Extensions/myext"
   stars        Int      @default(0)
   installInstructions String? // Markdown: steps, code snippets, requirements
+  compatibilityOs String @default("[]") // JSON array of supported operating systems
+  compatibilityAppVersions String @default("[]") // JSON array of supported app versions
+  compatibilityToolchain String @default("[]") // JSON array of supported toolchain versions
   visibility   String   @default("members") // "members" | "teams"
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -97,6 +100,9 @@ model ListingSubmission {
   thumbnailUrl     String?
   tags             String   @default("[]")
   installInstructions String?
+  compatibilityOs String @default("[]")
+  compatibilityAppVersions String @default("[]")
+  compatibilityToolchain String @default("[]")
   visibility       String   @default("members") // "members" | "teams"
   submittedByUserId String
   status           String   @default("pending") // "pending" | "approved" | "rejected"

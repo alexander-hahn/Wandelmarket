@@ -36,6 +36,9 @@ export async function GET(req: Request) {
       thumbnailUrl: string | null;
       tags: string;
       installInstructions: string | null;
+      compatibilityOs: string;
+      compatibilityAppVersions: string;
+      compatibilityToolchain: string;
       submittedByUserId: string;
       status: string;
       approvedByUserId: string | null;
@@ -64,6 +67,9 @@ export async function POST(req: Request) {
     thumbnailUrl,
     tags,
     installInstructions,
+    compatibilityOs,
+    compatibilityAppVersions,
+    compatibilityToolchain,
     visibility,
     teamIds,
   } = body as {
@@ -77,6 +83,9 @@ export async function POST(req: Request) {
     thumbnailUrl?: string;
     tags?: unknown;
     installInstructions?: string;
+    compatibilityOs?: unknown;
+    compatibilityAppVersions?: unknown;
+    compatibilityToolchain?: unknown;
     visibility?: string;
     teamIds?: unknown;
   };
@@ -91,6 +100,13 @@ export async function POST(req: Request) {
   const derivedAuthor = auth.user.displayName?.trim() || auth.user.id;
 
   const safeTags = JSON.stringify(Array.isArray(tags) ? tags : []);
+  const safeCompatibilityOs = JSON.stringify(Array.isArray(compatibilityOs) ? compatibilityOs : []);
+  const safeCompatibilityAppVersions = JSON.stringify(
+    Array.isArray(compatibilityAppVersions) ? compatibilityAppVersions : []
+  );
+  const safeCompatibilityToolchain = JSON.stringify(
+    Array.isArray(compatibilityToolchain) ? compatibilityToolchain : []
+  );
   const normalizedVisibility = normalizeVisibility(visibility);
   const requestedTeamIds = parseTeamIds(teamIds);
 
@@ -130,6 +146,9 @@ export async function POST(req: Request) {
         thumbnailUrl: thumbnailUrl || undefined,
         tags: safeTags,
         installInstructions: installInstructions || undefined,
+        compatibilityOs: safeCompatibilityOs,
+        compatibilityAppVersions: safeCompatibilityAppVersions,
+        compatibilityToolchain: safeCompatibilityToolchain,
         visibility: normalizedVisibility,
         submittedByUserId: auth.user.id,
         status: "pending",
@@ -154,9 +173,9 @@ export async function POST(req: Request) {
 
   await prisma.$executeRaw`
     INSERT INTO "ListingSubmission"
-      ("id", "name", "description", "category", "author", "version", "downloadUrl", "repoUrl", "websiteUrl", "thumbnailUrl", "tags", "installInstructions", "visibility", "submittedByUserId", "status", "createdAt", "updatedAt")
+      ("id", "name", "description", "category", "author", "version", "downloadUrl", "repoUrl", "websiteUrl", "thumbnailUrl", "tags", "installInstructions", "compatibilityOs", "compatibilityAppVersions", "compatibilityToolchain", "visibility", "submittedByUserId", "status", "createdAt", "updatedAt")
     VALUES
-      (${id}, ${name}, ${description}, ${category}, ${derivedAuthor}, ${version || null}, ${downloadUrl || null}, ${repoUrl || null}, ${websiteUrl || null}, ${thumbnailUrl || null}, ${safeTags}, ${installInstructions || null}, ${normalizedVisibility}, ${auth.user.id}, ${"pending"}, ${now}, ${now})
+      (${id}, ${name}, ${description}, ${category}, ${derivedAuthor}, ${version || null}, ${downloadUrl || null}, ${repoUrl || null}, ${websiteUrl || null}, ${thumbnailUrl || null}, ${safeTags}, ${installInstructions || null}, ${safeCompatibilityOs}, ${safeCompatibilityAppVersions}, ${safeCompatibilityToolchain}, ${normalizedVisibility}, ${auth.user.id}, ${"pending"}, ${now}, ${now})
   `;
 
   if (normalizedVisibility === "teams") {

@@ -51,6 +51,9 @@ export async function PATCH(
     thumbnailUrl,
     tags,
     installInstructions,
+    compatibilityOs,
+    compatibilityAppVersions,
+    compatibilityToolchain,
     visibility,
     teamIds,
   } = body;
@@ -113,6 +116,19 @@ export async function PATCH(
       ...(thumbnailUrl !== undefined && { thumbnailOverride: thumbnailUrl || null }),
       ...(tags !== undefined && { tags: JSON.stringify(Array.isArray(tags) ? tags : []) }),
       ...(installInstructions !== undefined && { installInstructions }),
+      ...(compatibilityOs !== undefined && {
+        compatibilityOs: JSON.stringify(Array.isArray(compatibilityOs) ? compatibilityOs : []),
+      }),
+      ...(compatibilityAppVersions !== undefined && {
+        compatibilityAppVersions: JSON.stringify(
+          Array.isArray(compatibilityAppVersions) ? compatibilityAppVersions : []
+        ),
+      }),
+      ...(compatibilityToolchain !== undefined && {
+        compatibilityToolchain: JSON.stringify(
+          Array.isArray(compatibilityToolchain) ? compatibilityToolchain : []
+        ),
+      }),
       ...(normalizedVisibility !== undefined && { visibility: normalizedVisibility }),
     },
   });

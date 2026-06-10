@@ -59,6 +59,9 @@ export default async function HomePage({
       providerKey: string | null;
       stars: number;
       installInstructions: string | null;
+      compatibilityOs: string;
+      compatibilityAppVersions: string;
+      compatibilityToolchain: string;
       visibility: string;
       createdAt: Date;
       updatedAt: Date;

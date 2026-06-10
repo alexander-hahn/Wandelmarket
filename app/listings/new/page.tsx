@@ -32,6 +32,9 @@ interface UserListingEditPayload {
   thumbnailUrl: string | null;
   tags: string[];
   installInstructions: string | null;
+  compatibilityOs: string[];
+  compatibilityAppVersions: string[];
+  compatibilityToolchain: string[];
   visibility: "members" | "teams";
   teamIds: string[];
 }
@@ -53,6 +56,9 @@ export default function NewListingPage() {
     thumbnailUrl: "",
     tags: "",
     installInstructions: "",
+    compatibilityOs: "",
+    compatibilityAppVersions: "",
+    compatibilityToolchain: "",
   });
   const [githubRepoUrl, setGithubRepoUrl] = useState("");
   const [visibility, setVisibility] = useState<"members" | "teams">("members");
@@ -104,6 +110,13 @@ export default function NewListingPage() {
           thumbnailUrl: data.thumbnailUrl ?? "",
           tags: Array.isArray(data.tags) ? data.tags.join(", ") : "",
           installInstructions: data.installInstructions ?? "",
+          compatibilityOs: Array.isArray(data.compatibilityOs) ? data.compatibilityOs.join(", ") : "",
+          compatibilityAppVersions: Array.isArray(data.compatibilityAppVersions)
+            ? data.compatibilityAppVersions.join(", ")
+            : "",
+          compatibilityToolchain: Array.isArray(data.compatibilityToolchain)
+            ? data.compatibilityToolchain.join(", ")
+            : "",
         });
         setVisibility(data.visibility === "teams" ? "teams" : "members");
         setSelectedTeamIds(Array.isArray(data.teamIds) ? data.teamIds : []);
@@ -176,6 +189,15 @@ export default function NewListingPage() {
         thumbnailUrl: data.thumbnailUrl ?? prev.thumbnailUrl,
         tags: Array.isArray(data.tags) ? data.tags.join(", ") : prev.tags,
         installInstructions: data.installInstructions ?? prev.installInstructions,
+        compatibilityOs: Array.isArray(data.compatibilityOs)
+          ? data.compatibilityOs.join(", ")
+          : prev.compatibilityOs,
+        compatibilityAppVersions: Array.isArray(data.compatibilityAppVersions)
+          ? data.compatibilityAppVersions.join(", ")
+          : prev.compatibilityAppVersions,
+        compatibilityToolchain: Array.isArray(data.compatibilityToolchain)
+          ? data.compatibilityToolchain.join(", ")
+          : prev.compatibilityToolchain,
       }));
 
       setSuccess("Repository imported. Review the fields, then submit for admin approval.");
@@ -205,6 +227,18 @@ export default function NewListingPage() {
           .map((tag) => tag.trim())
           .filter(Boolean),
         installInstructions: form.installInstructions.trim() || null,
+        compatibilityOs: form.compatibilityOs
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+        compatibilityAppVersions: form.compatibilityAppVersions
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+        compatibilityToolchain: form.compatibilityToolchain
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
         visibility,
         teamIds: visibility === "teams" ? selectedTeamIds : [],
       };
@@ -237,6 +271,9 @@ export default function NewListingPage() {
           thumbnailUrl: "",
           tags: "",
           installInstructions: "",
+          compatibilityOs: "",
+          compatibilityAppVersions: "",
+          compatibilityToolchain: "",
         });
         setVisibility("members");
         setSelectedTeamIds([]);
@@ -455,6 +492,33 @@ export default function NewListingPage() {
             rows={4}
             value={form.installInstructions}
             onChange={(e) => setForm((prev) => ({ ...prev, installInstructions: e.target.value }))}
+          />
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <TextField
+              label="Supported OS (comma separated)"
+              fullWidth
+              value={form.compatibilityOs}
+              onChange={(e) => setForm((prev) => ({ ...prev, compatibilityOs: e.target.value }))}
+              placeholder="Windows, macOS, Ubuntu 24.04"
+            />
+            <TextField
+              label="Supported App Versions"
+              fullWidth
+              value={form.compatibilityAppVersions}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, compatibilityAppVersions: e.target.value }))
+              }
+              placeholder="Wandel Operate 2026.2, 2026.3"
+            />
+          </Stack>
+
+          <TextField
+            label="Supported Toolchain Versions"
+            fullWidth
+            value={form.compatibilityToolchain}
+            onChange={(e) => setForm((prev) => ({ ...prev, compatibilityToolchain: e.target.value }))}
+            placeholder="Isaac Sim 4.2, Python 3.11"
           />
 
           <Stack direction="row" spacing={1.5}>
