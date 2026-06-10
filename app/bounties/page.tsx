@@ -38,6 +38,18 @@ const CATEGORIES = CATEGORY_OPTIONS;
 
 const BOUNTY_VOTES_KEY = "wandelshop:bounty-votes";
 const BOUNTY_COLLECTED_KEY = "wandelshop:bounty-collected";
+const BOUNTIES_ANNOUNCEMENTS_DISMISSED_KEY = "wandelshop:announcements:dismissed:bounties";
+
+interface PageAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+  updatedAt: string;
+}
+
+function getAnnouncementDismissKey(announcement: PageAnnouncement): string {
+  return `${announcement.id}:${announcement.updatedAt}`;
+}
 
 export default function BountiesPage() {
   const router = useRouter();
@@ -58,6 +70,20 @@ export default function BountiesPage() {
   const [starFlash, setStarFlash] = useState<Record<string, number>>({});
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [collectingBountyId, setCollectingBountyId] = useState<string | null>(null);
+  const [announcements, setAnnouncements] = useState<PageAnnouncement[]>([]);
+  const [dismissedAnnouncementIds, setDismissedAnnouncementIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set<string>();
+    try {
+      const raw = window.sessionStorage.getItem(BOUNTIES_ANNOUNCEMENTS_DISMISSED_KEY);
+      if (!raw) return new Set<string>();
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return new Set<string>();
+      const ids = parsed.filter((id): id is string => typeof id === "string");
+      return new Set<string>(ids);
+    } catch {
+      return new Set<string>();
+    }
+  });
 
   const activeSection = searchParams.get("section") === "create-bounty" ? "create-bounty" : "open-bounties";
   const editId = searchParams.get("edit");
@@ -86,6 +112,51 @@ export default function BountiesPage() {
 
     return () => window.clearTimeout(timeoutId);
   }, [loadBounties]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAnnouncements = async () => {
+      try {
+        const res = await fetch("/api/announcements/public?target=bounties", { cache: "no-store" });
+        const data = (await res.json().catch(() => null)) as PageAnnouncement[] | null;
+        if (!res.ok || !Array.isArray(data)) return;
+        if (!cancelled) setAnnouncements(data);
+      } catch {
+        if (!cancelled) setAnnouncements([]);
+      }
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      void loadAnnouncements();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  const handleDismissAnnouncement = (announcementId: string) => {
+    setDismissedAnnouncementIds((prev) => {
+      const next = new Set(prev);
+      next.add(announcementId);
+      try {
+        window.sessionStorage.setItem(
+          BOUNTIES_ANNOUNCEMENTS_DISMISSED_KEY,
+          JSON.stringify(Array.from(next))
+        );
+      } catch {
+        // Ignore storage failures; in-memory dismissal still works.
+      }
+      return next;
+    });
+  };
+
+  const visibleAnnouncements = useMemo(
+    () => announcements.filter((announcement) => !dismissedAnnouncementIds.has(getAnnouncementDismissKey(announcement))),
+    [announcements, dismissedAnnouncementIds]
+  );
 
   useEffect(() => {
     const categoryFromUrl = searchParams.get("requestedCategory");
@@ -558,11 +629,33 @@ export default function BountiesPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
-        <Typography variant="h4" fontWeight={700} sx={{ lineHeight: 1 }}>
-          Bounties
-        </Typography>
-      </Stack>
+      {visibleAnnouncements.length > 0 && (
+        <Stack spacing={1} mb={2}>
+          {visibleAnnouncements.map((announcement) => (
+            <Alert
+              key={announcement.id}
+              variant="outlined"
+              severity="warning"
+              onClose={() => handleDismissAnnouncement(getAnnouncementDismissKey(announcement))}
+              sx={{
+                borderColor: "#f59e0b",
+                color: "#fbbf24",
+                "& .MuiAlert-icon": {
+                  color: "#f59e0b",
+                },
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ mb: 0.25, color: "#fbbf24" }}>
+                {announcement.title}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {announcement.message}
+              </Typography>
+            </Alert>
+          ))}
+        </Stack>
+      )}
+
       <Typography variant="body1" color="text.secondary" mb={3}>
         Request missing tools or models. Admins can convert accepted requests into listings.
       </Typography>
@@ -574,7 +667,7 @@ export default function BountiesPage() {
       <>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="h6" fontWeight={700}>
-            Most Popular Listings
+            Most Popular Bounties
           </Typography>
           <Typography variant="caption" color="text.secondary">
             Top {popularBounties.length}
@@ -598,7 +691,7 @@ export default function BountiesPage() {
 
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="h6" fontWeight={700}>
-            All Listings
+            All Bounties
           </Typography>
           <Chip label={`${openBounties.length} open`} size="small" />
         </Stack>

@@ -7,6 +7,7 @@ import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Paper from "@mui/material/Paper";
+import Switch from "@mui/material/Switch";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -155,6 +156,16 @@ interface ListingDeletionRequest {
   createdAt: string;
 }
 
+interface AnnouncementRecord {
+  id: string;
+  title: string;
+  message: string;
+  target: "wandelmarket" | "bounties";
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function isAllowedEmail(value: string) {
   return value.trim().toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN);
 }
@@ -188,12 +199,14 @@ export default function AdminPage() {
   const [listingSubmissions, setListingSubmissions] = useState<ListingSubmission[]>([]);
   const [listingDeletionRequests, setListingDeletionRequests] = useState<ListingDeletionRequest[]>([]);
   const [teams, setTeams] = useState<TeamRecord[]>([]);
+  const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingBounties, setLoadingBounties] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [loadingListingSubmissions, setLoadingListingSubmissions] = useState(true);
   const [loadingListingDeletionRequests, setLoadingListingDeletionRequests] = useState(true);
   const [loadingTeams, setLoadingTeams] = useState(true);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [convertingBountyId, setConvertingBountyId] = useState<string | null>(null);
   const [abortingBountyId, setAbortingBountyId] = useState<string | null>(null);
@@ -243,13 +256,38 @@ export default function AdminPage() {
   const [thumbnailMode, setThumbnailMode] = useState<"url" | "upload">("url");
   const [uploading, setUploading] = useState(false);
   const [syncResults, setSyncResults] = useState<Array<{ provider: string; synced: number; error?: string }>>([]);
-  const [activeTab, setActiveTab] = useState<"analytics" | "content" | "tasks" | "users" | "teams">("content");
+  const [activeTab, setActiveTab] = useState<"analytics" | "content" | "announcements" | "tasks" | "users" | "teams">("content");
   const [analyticsNowMs, setAnalyticsNowMs] = useState<number | null>(null);
+  const [creatingAnnouncement, setCreatingAnnouncement] = useState(false);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
+  const [updatingAnnouncementId, setUpdatingAnnouncementId] = useState<string | null>(null);
+  const [deletingAnnouncementId, setDeletingAnnouncementId] = useState<string | null>(null);
+  const [announcementForm, setAnnouncementForm] = useState<{
+    title: string;
+    message: string;
+    target: "wandelmarket" | "bounties";
+    enabled: boolean;
+  }>({
+    title: "",
+    message: "",
+    target: "wandelmarket",
+    enabled: true,
+  });
+
+  const resetAnnouncementForm = () => {
+    setAnnouncementForm({
+      title: "",
+      message: "",
+      target: "wandelmarket",
+      enabled: true,
+    });
+    setEditingAnnouncementId(null);
+  };
 
   useEffect(() => {
     const raw = searchParams.get("tab");
     const timeoutId = window.setTimeout(() => {
-      if (raw === "analytics" || raw === "content" || raw === "tasks" || raw === "users" || raw === "teams") {
+      if (raw === "analytics" || raw === "content" || raw === "announcements" || raw === "tasks" || raw === "users" || raw === "teams") {
         setActiveTab(raw);
       } else {
         setActiveTab("content");
@@ -267,7 +305,7 @@ export default function AdminPage() {
     return () => window.clearTimeout(timeoutId);
   }, []);
 
-  const setAdminTab = (tab: "analytics" | "content" | "tasks" | "users" | "teams") => {
+  const setAdminTab = (tab: "analytics" | "content" | "announcements" | "tasks" | "users" | "teams") => {
     setActiveTab(tab);
     router.replace(`/admin?tab=${tab}`);
   };
@@ -535,6 +573,21 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadAnnouncements = useCallback(async () => {
+    setLoadingAnnouncements(true);
+    try {
+      const res = await fetch("/api/announcements", { cache: "no-store" });
+      const data = await readJsonSafe<{ error?: string } | unknown[]>(res);
+      if (!res.ok) throw new Error((data as { error?: string } | null)?.error || "Failed to load announcements");
+      setAnnouncements(Array.isArray(data) ? (data as AnnouncementRecord[]) : []);
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "Failed to load announcements", severity: "error" });
+      setAnnouncements([]);
+    } finally {
+      setLoadingAnnouncements(false);
+    }
+  }, []);
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void loadItems();
@@ -543,10 +596,102 @@ export default function AdminPage() {
       void loadListingSubmissions();
       void loadListingDeletionRequests();
       void loadTeams();
+      void loadAnnouncements();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [loadItems, loadBounties, loadUsers, loadListingSubmissions, loadListingDeletionRequests, loadTeams]);
+  }, [loadItems, loadBounties, loadUsers, loadListingSubmissions, loadListingDeletionRequests, loadTeams, loadAnnouncements]);
+
+  const handleSaveAnnouncement = async () => {
+    if (!announcementForm.title.trim() || !announcementForm.message.trim()) {
+      setToast({ message: "Title and message are required", severity: "error" });
+      return;
+    }
+
+    if (editingAnnouncementId) {
+      setUpdatingAnnouncementId(editingAnnouncementId);
+    } else {
+      setCreatingAnnouncement(true);
+    }
+
+    try {
+      const res = await fetch(editingAnnouncementId ? `/api/announcements/${editingAnnouncementId}` : "/api/announcements", {
+        method: editingAnnouncementId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: announcementForm.title,
+          message: announcementForm.message,
+          target: announcementForm.target,
+          enabled: announcementForm.enabled,
+        }),
+      });
+      const data = await readJsonSafe<{ error?: string }>(res);
+      if (!res.ok) {
+        throw new Error(data?.error || (editingAnnouncementId ? "Failed to update announcement" : "Failed to create announcement"));
+      }
+
+      resetAnnouncementForm();
+      setToast({ message: editingAnnouncementId ? "Announcement updated" : "Announcement created", severity: "success" });
+      await loadAnnouncements();
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "Failed to save announcement", severity: "error" });
+    } finally {
+      setCreatingAnnouncement(false);
+      setUpdatingAnnouncementId(null);
+    }
+  };
+
+  const handleEditAnnouncement = (announcement: AnnouncementRecord) => {
+    setEditingAnnouncementId(announcement.id);
+    setAnnouncementForm({
+      title: announcement.title,
+      message: announcement.message,
+      target: announcement.target,
+      enabled: announcement.enabled,
+    });
+  };
+
+  const handleToggleAnnouncement = async (announcement: AnnouncementRecord) => {
+    setUpdatingAnnouncementId(announcement.id);
+    try {
+      const res = await fetch(`/api/announcements/${announcement.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !announcement.enabled }),
+      });
+      const data = await readJsonSafe<{ error?: string }>(res);
+      if (!res.ok) throw new Error(data?.error || "Failed to update announcement status");
+
+      setToast({ message: `Announcement ${announcement.enabled ? "disabled" : "enabled"}`, severity: "success" });
+      await loadAnnouncements();
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "Failed to update announcement status", severity: "error" });
+    } finally {
+      setUpdatingAnnouncementId(null);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (announcementId: string) => {
+    const confirmed = window.confirm("Delete this announcement?");
+    if (!confirmed) return;
+
+    setDeletingAnnouncementId(announcementId);
+    try {
+      const res = await fetch(`/api/announcements/${announcementId}`, { method: "DELETE" });
+      const data = await readJsonSafe<{ error?: string }>(res);
+      if (!res.ok) throw new Error(data?.error || "Failed to delete announcement");
+
+      if (editingAnnouncementId === announcementId) {
+        resetAnnouncementForm();
+      }
+      setToast({ message: "Announcement deleted", severity: "success" });
+      await loadAnnouncements();
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "Failed to delete announcement", severity: "error" });
+    } finally {
+      setDeletingAnnouncementId(null);
+    }
+  };
 
   const handleConvertBounty = (bounty: BountyRequest) => {
     const requester = normalizeIdentity(bounty.requester);
@@ -1321,6 +1466,187 @@ export default function AdminPage() {
           )}
 
         </>
+      )}
+
+      {activeTab === "announcements" && (
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="h6" fontWeight={700}>
+              Announcements
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Create announcements and choose where they are displayed.
+            </Typography>
+          </Box>
+
+          <Paper variant="outlined" sx={[listTableContainerSx, { p: 2 }]}> 
+            <Stack spacing={1.5}>
+              {editingAnnouncementId && (
+                <Alert severity="info" variant="outlined">
+                  Editing announcement. Save changes or cancel to create a new one.
+                </Alert>
+              )}
+              <TextField
+                label="Title"
+                value={announcementForm.title}
+                onChange={(e) => setAnnouncementForm((prev) => ({ ...prev, title: e.target.value }))}
+                fullWidth
+              />
+              <TextField
+                label="Message"
+                value={announcementForm.message}
+                onChange={(e) => setAnnouncementForm((prev) => ({ ...prev, message: e.target.value }))}
+                fullWidth
+                multiline
+                minRows={3}
+              />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                <TextField
+                  select
+                  label="Display On"
+                  value={announcementForm.target}
+                  onChange={(e) =>
+                    setAnnouncementForm((prev) => ({
+                      ...prev,
+                      target: e.target.value as "wandelmarket" | "bounties",
+                    }))
+                  }
+                  fullWidth
+                >
+                  <MenuItem value="wandelmarket">Wandelmarket</MenuItem>
+                  <MenuItem value="bounties">Bounties</MenuItem>
+                </TextField>
+                <TextField
+                  select
+                  label="Status"
+                  value={announcementForm.enabled ? "enabled" : "disabled"}
+                  onChange={(e) =>
+                    setAnnouncementForm((prev) => ({
+                      ...prev,
+                      enabled: e.target.value === "enabled",
+                    }))
+                  }
+                  fullWidth
+                >
+                  <MenuItem value="enabled">Enabled</MenuItem>
+                  <MenuItem value="disabled">Disabled</MenuItem>
+                </TextField>
+              </Stack>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  variant="contained"
+                  onClick={handleSaveAnnouncement}
+                  disabled={creatingAnnouncement || !!updatingAnnouncementId}
+                >
+                  {creatingAnnouncement
+                    ? "Creating..."
+                    : updatingAnnouncementId && editingAnnouncementId === updatingAnnouncementId
+                    ? "Saving..."
+                    : editingAnnouncementId
+                    ? "Save Announcement"
+                    : "Create Announcement"}
+                </Button>
+                {editingAnnouncementId && (
+                  <Button
+                    variant="outlined"
+                    onClick={resetAnnouncementForm}
+                    disabled={!!updatingAnnouncementId}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </Stack>
+            </Stack>
+          </Paper>
+
+          {loadingAnnouncements ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+              <CircularProgress size={26} />
+            </Box>
+          ) : (
+            <TableContainer component={Paper} variant="outlined" sx={listTableContainerSx}>
+              <Table size="small">
+                <TableHead sx={listTableHeadSx}>
+                  <TableRow>
+                    <TableCell>Actions</TableCell>
+                    <TableCell>Title</TableCell>
+                    <TableCell>Display On</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Message</TableCell>
+                    <TableCell>Created</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {announcements.map((announcement) => (
+                    <TableRow key={announcement.id} hover sx={listTableRowSx}>
+                      <TableCell>
+                        <Stack direction="column" spacing={0.5} alignItems="flex-start">
+                          <Tooltip title="Edit">
+                            <span>
+                              <IconButton
+                                size="small"
+                                sx={listActionIconButtonSx}
+                                onClick={() => handleEditAnnouncement(announcement)}
+                                disabled={deletingAnnouncementId === announcement.id}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title={deletingAnnouncementId === announcement.id ? "Deleting..." : "Delete"}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                sx={listActionIconButtonSx}
+                                onClick={() => void handleDeleteAnnouncement(announcement.id)}
+                                disabled={deletingAnnouncementId === announcement.id || updatingAnnouncementId === announcement.id}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>{announcement.title}</TableCell>
+                      <TableCell>{announcement.target === "wandelmarket" ? "Wandelmarket" : "Bounties"}</TableCell>
+                      <TableCell>
+                        <Switch
+                          size="small"
+                          checked={announcement.enabled}
+                          onChange={() => handleToggleAnnouncement(announcement)}
+                          color="warning"
+                          disabled={updatingAnnouncementId === announcement.id || deletingAnnouncementId === announcement.id}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 520 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {announcement.message}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{new Date(announcement.createdAt).toLocaleDateString()}</TableCell>
+                    </TableRow>
+                  ))}
+                  {announcements.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} sx={{ py: 3, color: "text.secondary" }}>
+                        No announcements yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Stack>
       )}
 
       {activeTab === "tasks" && (

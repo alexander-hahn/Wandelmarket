@@ -9,6 +9,7 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import Divider from "@mui/material/Divider";
+import Alert from "@mui/material/Alert";
 import SearchIcon from "@mui/icons-material/Search";
 import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
 import ItemCard from "@/components/ItemCard";
@@ -17,18 +18,66 @@ import type { ShopItem } from "@prisma/client";
 
 const FAVORITES_KEY = "wandelshop:favorites";
 const FAVORITES_CHANGED_EVENT = "wandelshop:favorites:changed";
+const MARKET_ANNOUNCEMENTS_DISMISSED_KEY = "wandelshop:announcements:dismissed:market";
+
+interface MarketAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+  updatedAt: string | Date;
+}
+
+function getAnnouncementDismissKey(announcement: MarketAnnouncement): string {
+  return `${announcement.id}:${new Date(announcement.updatedAt).toISOString()}`;
+}
 
 export default function BrowseGrid({
   items,
   initialCategory = "all",
+  announcements = [],
 }: {
   items: Array<ShopItem>;
   initialCategory?: string;
   counts?: Record<string, number>;
+  announcements?: MarketAnnouncement[];
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [favorites, setFavorites] = useState<Set<string>>(new Set<string>());
+  const [dismissedAnnouncementIds, setDismissedAnnouncementIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set<string>();
+    try {
+      const raw = window.sessionStorage.getItem(MARKET_ANNOUNCEMENTS_DISMISSED_KEY);
+      if (!raw) return new Set<string>();
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return new Set<string>();
+      const ids = parsed.filter((id): id is string => typeof id === "string");
+      return new Set<string>(ids);
+    } catch {
+      return new Set<string>();
+    }
+  });
+
+  const handleDismissAnnouncement = (announcementId: string) => {
+    setDismissedAnnouncementIds((prev) => {
+      const next = new Set(prev);
+      next.add(announcementId);
+      try {
+        window.sessionStorage.setItem(
+          MARKET_ANNOUNCEMENTS_DISMISSED_KEY,
+          JSON.stringify(Array.from(next))
+        );
+      } catch {
+        // Ignore storage failures; UI state still updates for this render.
+      }
+      return next;
+    });
+  };
+
+  const visibleAnnouncements = useMemo(
+    () => announcements.filter((announcement) => !dismissedAnnouncementIds.has(getAnnouncementDismissKey(announcement))),
+    [announcements, dismissedAnnouncementIds]
+  );
 
   useEffect(() => {
     const updateFavorites = () => {
@@ -86,6 +135,29 @@ export default function BrowseGrid({
   return (
     <>
       <Stack spacing={1.5} sx={{ mb: 3 }}>
+        {visibleAnnouncements.map((announcement) => (
+          <Alert
+            key={announcement.id}
+            variant="outlined"
+            severity="warning"
+            onClose={() => handleDismissAnnouncement(getAnnouncementDismissKey(announcement))}
+            sx={{
+              borderColor: "#f59e0b",
+              color: "#fbbf24",
+              "& .MuiAlert-icon": {
+                color: "#f59e0b",
+              },
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ mb: 0.25, color: "#fbbf24" }}>
+              {announcement.title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {announcement.message}
+            </Typography>
+          </Alert>
+        ))}
+
         <TextField
           placeholder="Search by name, author, or description…"
           size="small"

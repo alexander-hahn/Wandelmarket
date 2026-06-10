@@ -142,6 +142,20 @@ model TeamOwnershipAudit {
   @@index([createdAt])
 }
 
+model Announcement {
+  id        String   @id
+  title     String
+  message   String
+  target    String   // "wandelmarket" | "bounties"
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([target])
+  @@index([enabled])
+  @@index([createdAt])
+}
+
 model AppUserTeam {
   userId    String
   teamId    String

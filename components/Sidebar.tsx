@@ -20,6 +20,7 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import PostAddIcon from "@mui/icons-material/PostAdd";
 import PersonIcon from "@mui/icons-material/Person";
 import GroupsIcon from "@mui/icons-material/Groups";
+import CampaignIcon from "@mui/icons-material/Campaign";
 import { alpha } from "@mui/material/styles";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -69,6 +70,7 @@ const CATEGORIES = [
 
 const ADMIN_SECTIONS = [
   { value: "content", label: "Content", icon: <GridViewIcon fontSize="small" /> },
+  { value: "announcements", label: "Announcements", icon: <CampaignIcon fontSize="small" /> },
   { value: "tasks", label: "Tasks", icon: <PostAddIcon fontSize="small" /> },
   { value: "users", label: "Users", icon: <PersonIcon fontSize="small" /> },
   { value: "teams", label: "Teams", icon: <GroupsIcon fontSize="small" /> },

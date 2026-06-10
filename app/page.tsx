@@ -99,9 +99,21 @@ export default async function HomePage({
     counts[item.category] = (counts[item.category] ?? 0) + 1;
   }
 
+  const announcements = await prisma.$queryRaw<Array<{ id: string; title: string; message: string; updatedAt: Date }>>`
+    SELECT "id", "title", "message", "updatedAt"
+    FROM "Announcement"
+    WHERE "target" = ${"wandelmarket"} AND "enabled" = ${1}
+    ORDER BY "createdAt" DESC
+  `;
+
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
-      <BrowseGrid items={normalizedItems} initialCategory={category ?? "all"} counts={counts} />
+      <BrowseGrid
+        items={normalizedItems}
+        initialCategory={category ?? "all"}
+        counts={counts}
+        announcements={announcements}
+      />
     </Container>
   );
 }
