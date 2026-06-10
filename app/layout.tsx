@@ -47,7 +47,7 @@ export default async function RootLayout({
               <Sidebar />
             </Suspense>
             {/* pt pushes content below fixed TopNav; flex row reserves sidebar width via placeholder */}
-            <Box sx={{ display: "flex", pt: "64px" }}>
+            <Box sx={{ display: "flex", pt: "64px", height: "100vh", overflow: "hidden" }}>
               {/* Invisible placeholder that reserves exactly the sidebar width */}
               <Box sx={{ width: SIDEBAR_WIDTH, flexShrink: 0 }} />
               <Box
@@ -55,7 +55,16 @@ export default async function RootLayout({
                 sx={{
                   flex: 1,
                   minWidth: 0,
-                  minHeight: "calc(100vh - 64px)",
+                  height: "calc(100vh - 64px)",
+                  overflowY: "auto",
+                  overflowX: "hidden",
+                  scrollbarWidth: "none",
+                  msOverflowStyle: "none",
+                  "&::-webkit-scrollbar": {
+                    display: "none",
+                    width: 0,
+                    height: 0,
+                  },
                 }}
               >
                 {children}

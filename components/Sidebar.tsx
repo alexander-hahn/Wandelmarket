@@ -180,6 +180,13 @@ export default function Sidebar({ counts }: { counts?: Record<string, number> })
           pt: 2,
           flex: 1,
           overflowY: "auto",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          "&::-webkit-scrollbar": {
+            display: "none",
+            width: 0,
+            height: 0,
+          },
         }}
       >
         {pathname === "/bounties" ? (
