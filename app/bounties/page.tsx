@@ -18,6 +18,7 @@ import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import { useRouter, useSearchParams } from "next/navigation";
 import CardCarousel from "@/components/CardCarousel";
+import CollectBountyDialog, { type BountySubmissionData } from "@/components/CollectBountyDialog";
 import CoinPurseIcon from "@/components/icons/CoinPurseIcon";
 import { CATEGORY_COLORS, CATEGORY_LABELS, CATEGORY_OPTIONS } from "@/lib/categories";
 import { listTableContainerSx } from "@/lib/listTheme";
@@ -71,6 +72,9 @@ export default function BountiesPage() {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [collectingBountyId, setCollectingBountyId] = useState<string | null>(null);
   const [announcements, setAnnouncements] = useState<PageAnnouncement[]>([]);
+  const [collectDialogOpen, setCollectDialogOpen] = useState(false);
+  const [selectedBountyForCollection, setSelectedBountyForCollection] = useState<BountyRequest | null>(null);
+  const [submittingCollection, setSubmittingCollection] = useState(false);
   const [dismissedAnnouncementIds, setDismissedAnnouncementIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set<string>();
     try {
@@ -404,28 +408,40 @@ export default function BountiesPage() {
       return;
     }
 
-    setCollectingBountyId(bountyId);
+    // Open dialog for collecting bounty with listing details
+    const bounty = bounties.find((b) => b.id === bountyId);
+    if (bounty) {
+      setSelectedBountyForCollection(bounty);
+      setCollectDialogOpen(true);
+    }
+  };
+
+  const handleSubmitBountyCollection = async (formData: BountySubmissionData) => {
+    if (!selectedBountyForCollection) return;
+
+    setSubmittingCollection(true);
     setError(null);
-    setSuccess(null);
 
     try {
-      const res = await fetch(`/api/bounties/${bountyId}/collect`, {
+      const res = await fetch(`/api/bounties/${selectedBountyForCollection.id}/submit`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to collect bounty");
+      if (!res.ok) throw new Error(data.error || "Failed to submit bounty collection");
 
       const nextCollected = new Set(collectedBountyIds);
-      nextCollected.add(bountyId);
+      nextCollected.add(selectedBountyForCollection.id);
       setCollectedBountyIds(nextCollected);
       window.localStorage.setItem(BOUNTY_COLLECTED_KEY, JSON.stringify(Array.from(nextCollected)));
 
-      setSuccess("Bounty marked as pending and toggled as collected for you.");
+      setSuccess("Bounty listing submitted! Awaiting bounty creator approval.");
       await loadBounties();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to collect bounty");
+      throw err;
     } finally {
-      setCollectingBountyId(null);
+      setSubmittingCollection(false);
     }
   };
 
@@ -628,9 +644,10 @@ export default function BountiesPage() {
   );
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {visibleAnnouncements.length > 0 && (
-        <Stack spacing={1} mb={2}>
+    <>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        {visibleAnnouncements.length > 0 && (
+          <Stack spacing={1} mb={2}>
           {visibleAnnouncements.map((announcement) => (
             <Alert
               key={announcement.id}
@@ -772,5 +789,19 @@ export default function BountiesPage() {
       </Paper>
       )}
     </Container>
+
+    <CollectBountyDialog
+      open={collectDialogOpen}
+      bountyId={selectedBountyForCollection?.id}
+      bountyTitle={selectedBountyForCollection?.title}
+      requestedCategory={selectedBountyForCollection?.requestedCategory}
+      onClose={() => {
+        setCollectDialogOpen(false);
+        setSelectedBountyForCollection(null);
+      }}
+      onSubmit={handleSubmitBountyCollection}
+      loading={submittingCollection}
+    />
+  </>
   );
 }

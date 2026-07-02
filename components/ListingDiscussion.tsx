@@ -12,6 +12,7 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import { getUserInitials, getNameInitials, type AuthUser } from "@/lib/userUtils";
 
 interface ListingComment {
   id: string;
@@ -35,6 +36,7 @@ export default function ListingDiscussion({
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(initialCurrentUserId ?? null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const hasMessage = useMemo(() => message.trim().length > 0, [message]);
@@ -84,9 +86,10 @@ export default function ListingDiscussion({
         const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
         if (!res.ok) return;
 
-        const data = (await res.json().catch(() => null)) as { id?: string } | null;
+        const data = (await res.json().catch(() => null)) as AuthUser | null;
         if (!cancelled && data?.id) {
           setCurrentUserId(data.id);
+          setCurrentUser(data);
         }
       } catch {
         // Ignore; delete controls stay hidden.
@@ -137,8 +140,8 @@ export default function ListingDiscussion({
       {error && <Alert severity="error">{error}</Alert>}
 
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
-        <Avatar sx={{ width: 32, height: 32, bgcolor: "warning.dark", fontSize: 12 }}>
-          You
+        <Avatar sx={{ width: 32, height: 32, fontSize: 12 }}>
+          {currentUser ? getUserInitials(currentUser) : "U"}
         </Avatar>
         <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
           <TextField
@@ -171,12 +174,10 @@ export default function ListingDiscussion({
       ) : (
         <Stack spacing={2}>
           {comments.map((comment) => {
-            const avatarLabel = comment.authorName.trim().charAt(0).toUpperCase() || "?";
-
             return (
               <Stack key={comment.id} direction="row" spacing={1.25} alignItems="flex-start">
-                <Avatar sx={{ width: 32, height: 32, bgcolor: "action.selected", color: "text.primary", fontSize: 13 }}>
-                  {avatarLabel}
+                <Avatar sx={{ width: 32, height: 32, fontSize: 12 }}>
+                  {getNameInitials(comment.authorName)}
                 </Avatar>
                 <Stack spacing={0.4} sx={{ flex: 1, minWidth: 0 }}>
                   <Stack direction="row" spacing={0.75} alignItems="baseline" flexWrap="wrap">

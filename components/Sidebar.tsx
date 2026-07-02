@@ -8,6 +8,7 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
+import CountChip from "@/components/TaskCountChip";
 import GridViewIcon from "@mui/icons-material/GridView";
 import AppsIcon from "@mui/icons-material/Apps";
 import ExtensionIcon from "@mui/icons-material/Extension";
@@ -21,6 +22,7 @@ import PostAddIcon from "@mui/icons-material/PostAdd";
 import PersonIcon from "@mui/icons-material/Person";
 import GroupsIcon from "@mui/icons-material/Groups";
 import CampaignIcon from "@mui/icons-material/Campaign";
+import AssignmentIcon from "@mui/icons-material/Assignment";
 import { alpha } from "@mui/material/styles";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -69,12 +71,12 @@ const CATEGORIES = [
 ];
 
 const ADMIN_SECTIONS = [
-  { value: "content", label: "Content", icon: <GridViewIcon fontSize="small" /> },
-  { value: "announcements", label: "Announcements", icon: <CampaignIcon fontSize="small" /> },
-  { value: "tasks", label: "Tasks", icon: <PostAddIcon fontSize="small" /> },
-  { value: "users", label: "Users", icon: <PersonIcon fontSize="small" /> },
-  { value: "teams", label: "Teams", icon: <GroupsIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AppsIcon fontSize="small" /> },
+  { value: "announcements", label: "Announcements", icon: <CampaignIcon fontSize="small" /> },
+  { value: "content", label: "Content", icon: <GridViewIcon fontSize="small" /> },
+  { value: "tasks", label: "Tasks", icon: <PostAddIcon fontSize="small" /> },
+  { value: "teams", label: "Teams", icon: <GroupsIcon fontSize="small" /> },
+  { value: "users", label: "Users", icon: <PersonIcon fontSize="small" /> },
 ];
 
 const USER_SECTIONS = [
@@ -82,6 +84,7 @@ const USER_SECTIONS = [
   { value: "teams", label: "Teams", icon: <GroupsIcon fontSize="small" /> },
   { value: "my-listings", label: "My Listings", icon: <PostAddIcon fontSize="small" /> },
   { value: "my-bounties", label: "My Bounties", icon: <EmojiEventsIcon fontSize="small" /> },
+  { value: "my-tasks", label: "My Tasks", icon: <AssignmentIcon fontSize="small" /> },
 ];
 
 export const SIDEBAR_WIDTH = 240;
@@ -98,7 +101,12 @@ export default function Sidebar({ counts }: { counts?: Record<string, number> })
   const activeAdminSection = pathname.startsWith("/admin") ? (searchParams.get("tab") ?? "content") : "content";
   const activeUserSection = pathname === "/user" ? (searchParams.get("section") ?? "user") : "user";
   const [favoriteCount, setFavoriteCount] = useState(0);
-  const [teams, setTeams] = useState<Array<{ id: string; name: string; slug: string; status?: string }>>([]);
+  const [teams, setTeams] = useState<{ id: string; name: string; slug: string; status?: string }[]>([]);
+  const [taskCount, setTaskCount] = useState(0);
+  const [listingsCount, setListingsCount] = useState(0);
+  const [bountiesCount, setBountiesCount] = useState(0);
+  const [openBountiesCount, setOpenBountiesCount] = useState(0);
+  const [liveListingsCount, setLiveListingsCount] = useState(0);
 
   useEffect(() => {
     const updateFavoriteCount = () => {
@@ -123,6 +131,115 @@ export default function Sidebar({ counts }: { counts?: Record<string, number> })
     return () => {
       window.removeEventListener("storage", updateFavoriteCount);
       window.removeEventListener(FAVORITES_CHANGED_EVENT, updateFavoriteCount as EventListener);
+    };
+  }, []);
+
+  const fetchTaskCounts = async (role: string | null) => {
+    if (!role) return;
+
+    try {
+      let totalTasks = 0;
+
+      // Fetch approval tasks (for all users)
+      const approvalRes = await fetch("/api/bounty-approvals/my-tasks", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (approvalRes.ok) {
+        const approvalTasks = (await approvalRes.json()) as Array<{ status: string }>;
+        if (Array.isArray(approvalTasks)) {
+          const pendingApprovalTasks = approvalTasks.filter((t) => t.status === "pending");
+          totalTasks += pendingApprovalTasks.length;
+        }
+      }
+
+      // Fetch publishing tasks (for admin/moderator only)
+      if (role === "admin" || role === "moderator") {
+        const publishingRes = await fetch("/api/bounty-publishing/my-tasks", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        if (publishingRes.ok) {
+          const publishingTasks = (await publishingRes.json()) as Array<{ status: string }>;
+          if (Array.isArray(publishingTasks)) {
+            const pendingPublishingTasks = publishingTasks.filter((t) => t.status === "pending");
+            totalTasks += pendingPublishingTasks.length;
+          }
+        }
+      }
+
+      setTaskCount(totalTasks);
+    } catch {
+      // Silently fail if task fetching fails
+    }
+  };
+
+  const fetchUserCounts = async () => {
+    try {
+      // Fetch user listings count
+      const listingsRes = await fetch("/api/items/my", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (listingsRes.ok) {
+        const listings = (await listingsRes.json()) as Array<{ id: string }>;
+        setListingsCount(Array.isArray(listings) ? listings.length : 0);
+      }
+
+      // Fetch user bounties count
+      const bountiesRes = await fetch("/api/bounties/my", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (bountiesRes.ok) {
+        const bounties = (await bountiesRes.json()) as Array<{ id: string }>;
+        setBountiesCount(Array.isArray(bounties) ? bounties.length : 0);
+      }
+
+      // Fetch open bounties count
+      const openBountiesRes = await fetch("/api/bounties?status=open", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (openBountiesRes.ok) {
+        const openBounties = (await openBountiesRes.json()) as Array<{ id: string }>;
+        setOpenBountiesCount(Array.isArray(openBounties) ? openBounties.length : 0);
+      }
+
+      // Fetch live listings count
+      const liveListingsRes = await fetch("/api/items?limit=1000", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (liveListingsRes.ok) {
+        const liveListings = (await liveListingsRes.json()) as Array<{ id: string }>;
+        setLiveListingsCount(Array.isArray(liveListings) ? liveListings.length : 0);
+      }
+    } catch {
+      // Silently fail if user counts fetching fails
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAuth = async () => {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+        if (!res.ok) return;
+        const user = (await res.json()) as { role?: string };
+        if (!cancelled) {
+          await fetchTaskCounts(user?.role ?? null);
+          await fetchUserCounts();
+        }
+      } catch {
+        // Silently fail
+      }
+    };
+
+    void loadAuth();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -218,21 +335,29 @@ export default function Sidebar({ counts }: { counts?: Record<string, number> })
                         backgroundColor: `${section.color}22`,
                         "&:hover": { backgroundColor: `${section.color}33` },
                       },
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                     }}
                   >
-                    <ListItemIcon sx={{ minWidth: 34, color: isSelected ? section.color : "text.secondary" }}>
-                      {section.icon}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={section.label}
-                      slotProps={{
-                        primary: {
-                          variant: "body2",
-                          fontWeight: isSelected ? 600 : 400,
-                          color: isSelected ? section.color : "text.primary",
-                        },
-                      }}
-                    />
+                    <Box sx={{ display: "flex", alignItems: "center", flex: 1 }}>
+                      <ListItemIcon sx={{ minWidth: 34, color: isSelected ? section.color : "text.secondary" }}>
+                        {section.icon}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={section.label}
+                        slotProps={{
+                          primary: {
+                            variant: "body2",
+                            fontWeight: isSelected ? 600 : 400,
+                            color: isSelected ? section.color : "text.primary",
+                          },
+                        }}
+                      />
+                    </Box>
+                    {section.value === "open-bounties" && (
+                      <CountChip count={openBountiesCount} />
+                    )}
                   </ListItemButton>
                 );
               })}
@@ -265,21 +390,29 @@ export default function Sidebar({ counts }: { counts?: Record<string, number> })
                         backgroundColor: "action.selected",
                         "&:hover": { backgroundColor: "action.selected" },
                       },
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                     }}
                   >
-                    <ListItemIcon sx={{ minWidth: 34, color: isSelected ? "primary.main" : "text.secondary" }}>
-                      {section.icon}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={section.label}
-                      slotProps={{
-                        primary: {
-                          variant: "body2",
-                          fontWeight: isSelected ? 600 : 400,
-                          color: isSelected ? "primary.main" : "text.primary",
-                        },
-                      }}
-                    />
+                    <Box sx={{ display: "flex", alignItems: "center", flex: 1 }}>
+                      <ListItemIcon sx={{ minWidth: 34, color: isSelected ? "primary.main" : "text.secondary" }}>
+                        {section.icon}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={section.label}
+                        slotProps={{
+                          primary: {
+                            variant: "body2",
+                            fontWeight: isSelected ? 600 : 400,
+                            color: isSelected ? "primary.main" : "text.primary",
+                          },
+                        }}
+                      />
+                    </Box>
+                    {section.value === "tasks" && (
+                      <CountChip count={taskCount} />
+                    )}
                   </ListItemButton>
                 );
               })}
@@ -311,21 +444,35 @@ export default function Sidebar({ counts }: { counts?: Record<string, number> })
                         backgroundColor: "action.selected",
                         "&:hover": { backgroundColor: "action.selected" },
                       },
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                     }}
                   >
-                    <ListItemIcon sx={{ minWidth: 34, color: isSelected ? "primary.main" : "text.secondary" }}>
-                      {section.icon}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={section.label}
-                      slotProps={{
-                        primary: {
-                          variant: "body2",
-                          fontWeight: isSelected ? 600 : 400,
-                          color: isSelected ? "primary.main" : "text.primary",
-                        },
-                      }}
-                    />
+                    <Box sx={{ display: "flex", alignItems: "center", flex: 1 }}>
+                      <ListItemIcon sx={{ minWidth: 34, color: isSelected ? "primary.main" : "text.secondary" }}>
+                        {section.icon}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={section.label}
+                        slotProps={{
+                          primary: {
+                            variant: "body2",
+                            fontWeight: isSelected ? 600 : 400,
+                            color: isSelected ? "primary.main" : "text.primary",
+                          },
+                        }}
+                      />
+                    </Box>
+                    {section.value === "my-tasks" && (
+                      <CountChip count={taskCount} />
+                    )}
+                    {section.value === "my-listings" && (
+                      <CountChip count={listingsCount} />
+                    )}
+                    {section.value === "my-bounties" && (
+                      <CountChip count={bountiesCount} />
+                    )}
                   </ListItemButton>
                 );
               })}
@@ -402,22 +549,30 @@ export default function Sidebar({ counts }: { counts?: Record<string, number> })
                       backgroundColor: c.color ? `${c.color}22` : "action.selected",
                       "&:hover": { backgroundColor: c.color ? `${c.color}33` : "action.selected" },
                     },
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                   }}
                 >
-                  <ListItemIcon sx={{ minWidth: 34, color: isSelected ? (c.color ?? "primary.main") : "text.secondary" }}>
-                    {c.icon}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={c.label}
-                    slotProps={{
-                      primary: {
-                        variant: "body2",
-                        fontWeight: isSelected ? 600 : 400,
-                        color: c.color && isSelected ? c.color : "text.primary",
-                      },
-                    }}
-                  />
-                  {counts && (
+                  <Box sx={{ display: "flex", alignItems: "center", flex: 1 }}>
+                    <ListItemIcon sx={{ minWidth: 34, color: isSelected ? (c.color ?? "primary.main") : "text.secondary" }}>
+                      {c.icon}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={c.label}
+                      slotProps={{
+                        primary: {
+                          variant: "body2",
+                          fontWeight: isSelected ? 600 : 400,
+                          color: c.color && isSelected ? c.color : "text.primary",
+                        },
+                      }}
+                    />
+                  </Box>
+                  {c.value === "all" && liveListingsCount > 0 && (
+                    <CountChip count={liveListingsCount} />
+                  )}
+                  {counts && c.value !== "all" && (
                     <Typography variant="caption" color="text.disabled">
                       {counts[c.value] ?? 0}
                     </Typography>

@@ -19,14 +19,15 @@ export async function getCollectedBountiesForUser(userId: string): Promise<numbe
   await syncCollectedBountiesFromHistory(userId);
   await ensureCollectedBountiesColumn();
 
-  const rows = await prisma.$queryRaw<Array<{ collectedBounties: number }>>`
-    SELECT CAST(COALESCE("collectedBounties", 0) AS INT) as "collectedBounties"
+  const rows = await prisma.$queryRaw<Array<{ collectedBounties: number | bigint }>>`
+    SELECT COALESCE("collectedBounties", 0) as "collectedBounties"
     FROM "AppUser"
     WHERE "id" = ${userId}
     LIMIT 1
   `;
 
-  return rows[0]?.collectedBounties ?? 0;
+  const bounties = rows[0]?.collectedBounties ?? 0;
+  return Number(bounties);
 }
 
 export async function syncCollectedBountiesFromHistory(userId: string): Promise<number> {
@@ -55,7 +56,7 @@ export async function syncCollectedBountiesFromHistory(userId: string): Promise<
       .filter(Boolean)
   );
 
-  const historyRows = await prisma.$queryRaw<Array<{ requester: string; bountyStars: number }>>`
+  const historyRows = await prisma.$queryRaw<Array<{ requester: string; bountyStars: number | bigint }>>`
     SELECT "requester", "bountyStars"
     FROM "BountyRequest"
     WHERE "status" = ${"collected"} OR "status" = ${"deleted"}
@@ -65,7 +66,7 @@ export async function syncCollectedBountiesFromHistory(userId: string): Promise<
     const requester = row.requester?.trim().toLowerCase();
     if (!requester || !identitySet.has(requester)) return sum;
 
-    const stars = Number.isFinite(row.bountyStars) ? Math.max(0, Math.floor(row.bountyStars)) : 0;
+    const stars = Number.isFinite(Number(row.bountyStars)) ? Math.max(0, Math.floor(Number(row.bountyStars))) : 0;
     return sum + stars;
   }, 0);
 
@@ -81,9 +82,11 @@ export async function syncCollectedBountiesFromHistory(userId: string): Promise<
 export async function applyCollectedBountyRewards(bountyId: string, stars: number): Promise<void> {
   await ensureCollectedBountiesColumn();
 
+  const starsValue = Math.max(0, Math.floor(Number(stars)));
+
   await prisma.$executeRaw`
     UPDATE "AppUser"
-    SET "collectedBounties" = COALESCE("collectedBounties", 0) + ${Math.max(0, Math.floor(stars))}
+    SET "collectedBounties" = COALESCE("collectedBounties", 0) + ${starsValue}
     WHERE "id" IN (
       SELECT DISTINCT bc."collectorId"
       FROM "BountyCollect" bc

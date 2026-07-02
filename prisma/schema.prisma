@@ -87,6 +87,65 @@ model BountyCollect {
   @@unique([bountyId, collectorId])
 }
 
+model BountyApprovalTask {
+  id               String   @id @default(cuid())
+  bountyId         String
+  collectorId      String
+  itemId           String
+  approverUserId   String
+  status           String   @default("pending") // "pending" | "approved" | "rejected"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  approvedAt       DateTime?
+
+  @@index([bountyId])
+  @@index([approverUserId])
+  @@index([status])
+}
+
+model BountyPublishingTask {
+  id               String   @id @default(cuid())
+  bountyId         String
+  approvalTaskId   String
+  itemId           String
+  status           String   @default("pending") // "pending" | "published" | "rejected"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  publishedAt      DateTime?
+
+  @@index([bountyId])
+  @@index([status])
+}
+
+model BountySubmission {
+  id                         String   @id @default(cuid())
+  bountyId                   String
+  collectorId                String
+  name                       String
+  description                String
+  category                   String
+  version                    String?
+  downloadUrl                String?
+  repoUrl                    String?
+  websiteUrl                 String?
+  thumbnailUrl               String?
+  tags                       String   @default("[]")
+  installInstructions        String?
+  compatibilityOs            String   @default("[]")
+  compatibilityAppVersions   String   @default("[]")
+  compatibilityToolchain     String   @default("[]")
+  status                     String   @default("pending") // "pending" | "approved" | "rejected"
+  approvedByBountyRequester  Boolean  @default(false)
+  approvalTaskId             String?
+  publishingTaskId           String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@index([bountyId])
+  @@index([collectorId])
+  @@index([status])
+}
+
 model ListingSubmission {
   id               String   @id @default(cuid())
   name             String

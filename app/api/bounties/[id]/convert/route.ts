@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireRoles } from "@/lib/auth";
 
+function generateId(): string {
+  return Array.from({ length: 16 })
+    .map(() => Math.floor(Math.random() * 16).toString(16))
+    .join("");
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -10,6 +16,7 @@ export async function POST(
   if (auth.response) return auth.response;
 
   const { id } = await params;
+  const collectorId = auth.user?.id || "";
   let itemIdFromBody: string | undefined;
 
   try {
@@ -52,43 +59,54 @@ export async function POST(
       );
     }
 
+    let item;
     if (itemIdFromBody) {
-      const updatedBounty = await bountyRequest.update({
-        where: { id: bounty.id },
+      item = await prisma.shopItem.findUnique({ where: { id: itemIdFromBody } });
+      if (!item) {
+        return NextResponse.json({ error: "Item not found" }, { status: 404 });
+      }
+    } else {
+      item = await prisma.shopItem.create({
         data: {
-          status: "collected",
-          convertedItemId: itemIdFromBody,
+          name: bounty.title,
+          description: bounty.description,
+          category: bounty.requestedCategory || "project",
+          author: bounty.requester,
+          source: "manual",
+          tags: JSON.stringify(["bounty", "request"]),
         },
       });
-
-      try {
-        await prisma.$executeRaw`DELETE FROM "BountyCollect" WHERE "bountyId" = ${bounty.id}`;
-      } catch {
-        // Ignore when running against databases without the collect table yet.
-      }
-
-      const item = await prisma.shopItem.findUnique({ where: { id: itemIdFromBody } });
-      return NextResponse.json({ bounty: updatedBounty, item });
     }
 
-    const item = await prisma.shopItem.create({
-      data: {
-        name: bounty.title,
-        description: bounty.description,
-        category: bounty.requestedCategory || "project",
-        author: bounty.requester,
-        source: "manual",
-        tags: JSON.stringify(["bounty", "request"]),
-      },
-    });
+    // Create approval task for the bounty requester to review
+    const approvalTaskId = generateId();
+    const now = new Date();
+    
+    try {
+      await prisma.$executeRaw`
+        INSERT INTO "BountyApprovalTask" ("id", "bountyId", "collectorId", "itemId", "approverUserId", "status", "createdAt", "updatedAt")
+        VALUES (${approvalTaskId}, ${id}, ${collectorId}, ${item.id}, ${bounty.requester}, ${"pending"}, ${now}, ${now})
+      `;
+    } catch {
+      // Ignore if table doesn't exist yet
+    }
 
-    const updatedBounty = await bountyRequest.update({
-      where: { id: bounty.id },
-      data: {
-        status: "collected",
-        convertedItemId: item.id,
-      },
-    });
+    // Update bounty status to "collected" (pending approval)
+    const updatedBounty = itemIdFromBody
+      ? await bountyRequest.update({
+          where: { id: bounty.id },
+          data: {
+            status: "pending",
+            convertedItemId: itemIdFromBody,
+          },
+        })
+      : await bountyRequest.update({
+          where: { id: bounty.id },
+          data: {
+            status: "pending",
+            convertedItemId: item.id,
+          },
+        });
 
     try {
       await prisma.$executeRaw`DELETE FROM "BountyCollect" WHERE "bountyId" = ${bounty.id}`;
@@ -96,7 +114,7 @@ export async function POST(
       // Ignore when running against databases without the collect table yet.
     }
 
-    return NextResponse.json({ bounty: updatedBounty, item });
+    return NextResponse.json({ bounty: updatedBounty, item, approvalTaskId });
   }
 
   const rows = await prisma.$queryRaw<

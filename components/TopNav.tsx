@@ -10,77 +10,81 @@ import Divider from "@mui/material/Divider";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import Link from "next/link";
+import Box from "@mui/material/Box";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PersonIcon from "@mui/icons-material/Person";
-import { usePathname } from "next/navigation";
+import NotificationsIcon from "@mui/icons-material/Notifications";
+import { usePathname, useRouter } from "next/navigation";
 import CoinPurseIcon from "@/components/icons/CoinPurseIcon";
+import { getUserInitials, type AuthUser } from "@/lib/userUtils";
 
 const ADMIN_USER_ID_KEY = "wandelshop:admin-user-id";
 const ADMIN_USER_NAME_KEY = "wandelshop:admin-user-name";
 
-type AuthUser = {
-  id?: string;
-  firstName?: string | null;
-  lastName?: string | null;
-  displayName?: string | null;
-  email?: string | null;
-  role?: string | null;
-};
-
-function getUserInitials(user: AuthUser): string {
-  const first = (user.firstName ?? "").trim();
-  const last = (user.lastName ?? "").trim();
-
-  if (first && last) {
-    return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
-  }
-
-  if (first) {
-    return first.slice(0, 2).toUpperCase();
-  }
-
-  if (last) {
-    return last.slice(0, 2).toUpperCase();
-  }
-
-  const displayName = (user.displayName ?? "").trim();
-  if (displayName) {
-    const parts = displayName.split(/\s+/).filter(Boolean);
-    if (parts.length > 1) {
-      return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-    }
-    return parts[0]?.slice(0, 2).toUpperCase() || "U";
-  }
-
-  const emailLocalPart = (user.email ?? "").trim().split("@")[0] ?? "";
-  if (emailLocalPart) {
-    const normalized = emailLocalPart.replace(/[^a-zA-Z0-9]+/g, " ").trim();
-    if (normalized) {
-      const parts = normalized.split(/\s+/).filter(Boolean);
-      if (parts.length > 1) {
-        return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-      }
-      return parts[0]?.slice(0, 2).toUpperCase() || "U";
-    }
-  }
-
-  return "U";
-}
-
 export default function TopNav({ initialUser = null }: { initialUser?: AuthUser | null }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [canAccessAdmin, setCanAccessAdmin] = useState(initialUser?.role === "admin");
   const [isAuthenticated, setIsAuthenticated] = useState(Boolean(initialUser));
   const [loggingOut, setLoggingOut] = useState(false);
   const [avatarInitials, setAvatarInitials] = useState(initialUser ? getUserInitials(initialUser) : "U");
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
+  const [userRole, setUserRole] = useState<string | null>(initialUser?.role ?? null);
+  const [taskCount, setTaskCount] = useState(0);
+  const [pendingTasks, setPendingTasks] = useState<Array<{ status: string; bountyTitle?: string; itemName?: string; taskType: string }>>([]);
   const isMarketActive = pathname === "/" || pathname.startsWith("/item/");
   const isBountiesActive = pathname === "/bounties";
   const navValue = isMarketActive ? "market" : isBountiesActive ? "bounties" : false;
 
   const menuOpen = Boolean(menuAnchorEl);
+  const notificationMenuOpen = Boolean(notificationAnchorEl);
+
+  const fetchTaskCounts = async (role: string | null) => {
+    if (!role) return;
+
+    try {
+      let totalTasks = 0;
+      const tasks: Array<{ status: string; bountyTitle?: string; itemName?: string; taskType: string }> = [];
+
+      // Fetch approval tasks (for all users)
+      const approvalRes = await fetch("/api/bounty-approvals/my-tasks", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (approvalRes.ok) {
+        const approvalTasks = (await approvalRes.json()) as Array<{ status: string; bountyTitle?: string; itemName?: string }>;
+        if (Array.isArray(approvalTasks)) {
+          const pendingApprovalTasks = approvalTasks.filter((t) => t.status === "pending");
+          tasks.push(...pendingApprovalTasks.map((t) => ({ ...t, taskType: "approval" })));
+          totalTasks += pendingApprovalTasks.length;
+        }
+      }
+
+      // Fetch publishing tasks (for admin/moderator only)
+      if (role === "admin" || role === "moderator") {
+        const publishingRes = await fetch("/api/bounty-publishing/my-tasks", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        if (publishingRes.ok) {
+          const publishingTasks = (await publishingRes.json()) as Array<{ status: string; bountyTitle?: string; itemName?: string }>;
+          if (Array.isArray(publishingTasks)) {
+            const pendingPublishingTasks = publishingTasks.filter((t) => t.status === "pending");
+            tasks.push(...pendingPublishingTasks.map((t) => ({ ...t, taskType: "publishing" })));
+            totalTasks += pendingPublishingTasks.length;
+          }
+        }
+      }
+
+      setTaskCount(totalTasks);
+      setPendingTasks(tasks);
+    } catch {
+      // Silently fail if task fetching fails
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +101,8 @@ export default function TopNav({ initialUser = null }: { initialUser?: AuthUser 
           setIsAuthenticated(true);
           setCanAccessAdmin(user?.role === "admin");
           setAvatarInitials(getUserInitials(user));
+          setUserRole(user?.role ?? null);
+          await fetchTaskCounts(user?.role ?? null);
         }
       } catch {
         // Keep server-derived state if client refresh fails.
@@ -108,6 +114,23 @@ export default function TopNav({ initialUser = null }: { initialUser?: AuthUser 
       cancelled = true;
     };
   }, []);
+
+  const handleNotificationsClick = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationAnchorEl(event.currentTarget);
+  };
+
+  const handleCloseNotifications = () => {
+    setNotificationAnchorEl(null);
+  };
+
+  const handleViewAllTasks = () => {
+    handleCloseNotifications();
+    if (userRole === "admin" || userRole === "moderator") {
+      router.push("/admin?section=tasks");
+    } else {
+      router.push("/user?section=my-tasks");
+    }
+  };
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -197,6 +220,80 @@ export default function TopNav({ initialUser = null }: { initialUser?: AuthUser 
 
       {/* Right side: User menu */}
       <Stack direction="row" spacing={1} alignItems="center">
+        {isAuthenticated && (
+          <>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+              }}
+            >
+              <IconButton
+                size="small"
+                onClick={handleNotificationsClick}
+                sx={{
+                  color: "text.secondary",
+                  ...(taskCount > 0 && {
+                    animation: "glow 2s ease-in-out infinite",
+                    "@keyframes glow": {
+                      "0%, 100%": { textShadow: "0 0 5px rgba(255, 193, 7, 0.5)" },
+                      "50%": { textShadow: "0 0 20px rgba(255, 193, 7, 0.8)" },
+                    },
+                  }),
+                }}
+                aria-label="Open tasks"
+              >
+                <NotificationsIcon sx={{ fontSize: 20 }} />
+              </IconButton>
+            </Box>
+            <Menu
+              anchorEl={notificationAnchorEl}
+              open={notificationMenuOpen}
+              onClose={handleCloseNotifications}
+              transformOrigin={{ horizontal: "right", vertical: "top" }}
+              anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+              PaperProps={{
+                sx: {
+                  maxWidth: 400,
+                  maxHeight: 400,
+                },
+              }}
+            >
+              {pendingTasks.length === 0 ? (
+                <MenuItem disabled>
+                  <span style={{ color: "var(--mui-palette-text-secondary)" }}>No pending tasks</span>
+                </MenuItem>
+              ) : (
+                [
+                  ...pendingTasks.slice(0, 5).map((task, idx) => (
+                    <MenuItem key={idx}>
+                      <Stack spacing={0.5}>
+                        <div style={{ fontWeight: 500 }}>{task.bountyTitle || task.itemName}</div>
+                        <div style={{ fontSize: "0.875rem", color: "var(--mui-palette-text-secondary)" }}>
+                          {task.taskType === "approval"
+                            ? `Approve submission for ${task.itemName || "item"}`
+                            : "Publish approved bounty"}
+                        </div>
+                      </Stack>
+                    </MenuItem>
+                  )),
+                  pendingTasks.length > 5 ? (
+                    <MenuItem key="more-tasks" disabled>
+                      <span style={{ fontSize: "0.875rem", color: "var(--mui-palette-text-secondary)" }}>
+                        +{pendingTasks.length - 5} more...
+                      </span>
+                    </MenuItem>
+                  ) : null,
+                  <Divider key="divider" />,
+                  <MenuItem key="view-all" onClick={handleViewAllTasks}>
+                    <span style={{ fontWeight: 600, color: "var(--mui-palette-primary-main)" }}>View all tasks</span>
+                  </MenuItem>,
+                ].filter(Boolean)
+              )}
+            </Menu>
+          </>
+        )}
         {isAuthenticated && (
           <IconButton
             size="small"

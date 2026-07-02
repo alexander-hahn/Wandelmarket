@@ -16,5 +16,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
 
-  return NextResponse.json(user);
+  // Ensure all numeric fields are proper numbers (not BigInt)
+  return NextResponse.json({
+    ...user,
+    collectedBounties: Number(user.collectedBounties),
+  });
 }

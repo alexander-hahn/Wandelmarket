@@ -11,6 +11,7 @@ import { getSessionUserByToken, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import UserTeamsPanel from "@/components/UserTeamsPanel";
 import UserListingsPanel from "@/components/UserListingsPanel";
 import UserBountiesPanel from "@/components/UserBountiesPanel";
+import UserTasksPanel from "@/components/UserTasksPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function UserPage({
 }) {
   const { section } = await searchParams;
   const activeSection =
-    section === "teams" || section === "my-listings" || section === "my-bounties"
+    section === "teams" || section === "my-listings" || section === "my-bounties" || section === "my-tasks"
       ? section
       : "user";
 
@@ -85,8 +86,10 @@ export default async function UserPage({
         <UserTeamsPanel />
       ) : activeSection === "my-listings" ? (
         <UserListingsPanel />
-      ) : (
+      ) : activeSection === "my-bounties" ? (
         <UserBountiesPanel />
+      ) : (
+        <UserTasksPanel userRole={user.role} />
       )}
     </Container>
   );
